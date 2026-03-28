@@ -46,7 +46,7 @@ A Terminal User Interface (TUI) for managing GitHub issues and AI agents, writte
 ```bash
 git clone https://github.com/andreasbaumgartner/gilo.git
 cd gilo
-go build -o gilo
+go build -o gilo ./cmd/gilo/
 ```
 
 ### Run
@@ -60,7 +60,7 @@ Navigate to any Git repository with GitHub issues and run:
 You can also move the binary to a directory in your `PATH` for global access:
 
 ```bash
-go build -o gilo && mv gilo /usr/local/bin/
+go build -o gilo ./cmd/gilo/ && mv gilo /usr/local/bin/
 ```
 
 ## Usage
@@ -147,11 +147,29 @@ When you press `s` or `S` on an issue, gilo will:
 
 ```
 gilo/
-  main.go          # Application entry point and all TUI logic
-  go.mod           # Go module definition
-  go.sum           # Dependency checksums
-  .gitignore       # Git ignore rules
-  README.md        # This file
+  cmd/
+    gilo/
+      main.go                  # Application entry point
+  internal/
+    github/
+      github.go                # GitHub CLI wrapper (issues, labels, comments)
+    settings/
+      settings.go              # User settings (load/save)
+    tmux/
+      tmux.go                  # Tmux session and pane management
+    tui/
+      model.go                 # TUI model, types, messages, initialization
+      update.go                # Keyboard and event handling
+      view.go                  # UI rendering (panels, modals, status bar)
+      styles.go                # Lipgloss styles and colors
+      commands.go              # Bubbletea commands (async operations)
+      helpers.go               # Layout and string utilities
+    worktree/
+      worktree.go              # Git worktree management
+  go.mod                       # Go module definition
+  go.sum                       # Dependency checksums
+  .gitignore                   # Git ignore rules
+  README.md                    # This file
 ```
 
 ## Contributing
