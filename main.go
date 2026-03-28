@@ -18,6 +18,40 @@ import (
 	"golang.org/x/term"
 )
 
+// ── Settings ─────────────────────────────────────────────────────────────────
+
+type Settings struct {
+	DangerouslySkipPermissions bool `json:"dangerously_skip_permissions"`
+	PermissionWarningAcked     bool `json:"permission_warning_acked"`
+}
+
+func settingsPath() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".gilo", "settings.json")
+}
+
+func loadSettings() Settings {
+	data, err := os.ReadFile(settingsPath())
+	if err != nil {
+		return Settings{}
+	}
+	var s Settings
+	json.Unmarshal(data, &s)
+	return s
+}
+
+func saveSettings(s Settings) error {
+	path := settingsPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(s, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
 var (
 	colorActive   = lipgloss.Color("62")
 	colorInactive = lipgloss.Color("240")
@@ -115,6 +149,7 @@ const (
 	modalCreate
 	modalLabel
 	modalClaudeTask
+	modalPermissionWarning
 )
 
 type issuesLoadedMsg []Issue
@@ -184,6 +219,8 @@ type model struct {
 	tmuxPanes []TmuxPane
 
 	stateFilter string // "OPEN", "CLOSED", or "" (all)
+
+	settings Settings
 }
 
 func initialModel() model {
@@ -195,6 +232,7 @@ func initialModel() model {
 		viewport:    vp,
 		modal:       modalNone,
 		stateFilter: "OPEN",
+		settings:    loadSettings(),
 	}
 }
 
@@ -328,13 +366,13 @@ func createWorktreeCmd(issue Issue, split bool) tea.Cmd {
 	}
 }
 
-func createClaudeTaskCmd(issue Issue, split bool) tea.Cmd {
+func createClaudeTaskCmd(issue Issue, split bool, dangerouslySkipPermissions bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, worktreePath, existed, err := ensureWorktree(issue)
 		if err != nil {
 			return claudeTaskCreatedMsg{err: err, branch: branch}
 		}
-		return openClaudeInTmux(branch, worktreePath, existed, issue, split)
+		return openClaudeInTmux(branch, worktreePath, existed, issue, split, dangerouslySkipPermissions)
 	}
 }
 
@@ -426,7 +464,14 @@ func tmuxWindowExists(branch string) bool {
 	return false
 }
 
-func openClaudeInTmux(branch, worktreePath string, existed bool, issue Issue, split bool) claudeTaskCreatedMsg {
+func buildClaudeCommand(prompt string, dangerouslySkipPermissions bool) string {
+	if dangerouslySkipPermissions {
+		return fmt.Sprintf("claude --dangerously-skip-permissions %q", prompt)
+	}
+	return fmt.Sprintf("claude %q", prompt)
+}
+
+func openClaudeInTmux(branch, worktreePath string, existed bool, issue Issue, split bool, dangerouslySkipPermissions bool) claudeTaskCreatedMsg {
 	if os.Getenv("TMUX") == "" {
 		if _, err := exec.LookPath("tmux"); err != nil {
 			return claudeTaskCreatedMsg{
@@ -446,7 +491,8 @@ func openClaudeInTmux(branch, worktreePath string, existed bool, issue Issue, sp
 			}
 		}
 		prompt := buildClaudePrompt(issue)
-		exec.Command("tmux", "send-keys", "-t", branch, fmt.Sprintf("claude %q", prompt), "Enter").Run()
+		cmd := buildClaudeCommand(prompt, dangerouslySkipPermissions)
+		exec.Command("tmux", "send-keys", "-t", branch, cmd, "Enter").Run()
 		return claudeTaskCreatedMsg{branch: branch, path: worktreePath, existed: existed}
 	}
 
@@ -465,7 +511,8 @@ func openClaudeInTmux(branch, worktreePath string, existed bool, issue Issue, sp
 		}
 		// Send claude command to the newly created pane (last pane)
 		prompt := buildClaudePrompt(issue)
-		exec.Command("tmux", "send-keys", "-t", ":.+", fmt.Sprintf("claude %q", prompt), "Enter").Run()
+		cmd := buildClaudeCommand(prompt, dangerouslySkipPermissions)
+		exec.Command("tmux", "send-keys", "-t", ":.+", cmd, "Enter").Run()
 		return claudeTaskCreatedMsg{branch: branch, path: worktreePath, existed: existed, split: true}
 	}
 
@@ -477,7 +524,8 @@ func openClaudeInTmux(branch, worktreePath string, existed bool, issue Issue, sp
 		}
 	}
 	prompt := buildClaudePrompt(issue)
-	exec.Command("tmux", "send-keys", "-t", branch, fmt.Sprintf("claude %q", prompt), "Enter").Run()
+	cmd := buildClaudeCommand(prompt, dangerouslySkipPermissions)
+	exec.Command("tmux", "send-keys", "-t", branch, cmd, "Enter").Run()
 	return claudeTaskCreatedMsg{branch: branch, path: worktreePath, existed: existed}
 }
 
@@ -692,6 +740,20 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case modalPermissionWarning:
+		switch msg.String() {
+		case "y", "Y":
+			m.settings.DangerouslySkipPermissions = true
+			m.settings.PermissionWarningAcked = true
+			saveSettings(m.settings)
+			m.modal = modalNone
+			m.modalStatus = ""
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
 	case modalComment:
 		switch msg.String() {
 		case "esc":
@@ -867,8 +929,24 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modal = modalClaudeTask
 			m.modalIssue = issue.Number
 			m.modalStatus = ""
-			return m, createClaudeTaskCmd(issue, msg.String() == "S")
+			return m, createClaudeTaskCmd(issue, msg.String() == "S", m.settings.DangerouslySkipPermissions)
 		}
+
+	case "p":
+		if m.settings.DangerouslySkipPermissions {
+			// Toggle off — no warning needed
+			m.settings.DangerouslySkipPermissions = false
+			saveSettings(m.settings)
+		} else if m.settings.PermissionWarningAcked {
+			// Already acked the warning before — toggle on directly
+			m.settings.DangerouslySkipPermissions = true
+			saveSettings(m.settings)
+		} else {
+			// First time — show warning modal
+			m.modal = modalPermissionWarning
+			m.modalStatus = ""
+		}
+		return m, nil
 
 	case "c":
 		filtered := m.filteredIssues()
@@ -1013,7 +1091,21 @@ func (m model) renderModal() string {
 		if m.modalStatus != "" {
 			content = m.modalStatus
 		}
+		if m.settings.DangerouslySkipPermissions {
+			content += "\n\n" + lipgloss.NewStyle().Foreground(colorYellow).Render("⚡ Running with --dangerously-skip-permissions")
+		}
 		return modalStyle.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
+
+	case modalPermissionWarning:
+		title := titleStyle.Render("⚠ Enable All Permissions")
+		warning := lipgloss.NewStyle().Foreground(colorYellow).Render(
+			"WARNING: This will run Claude with --dangerously-skip-permissions.\n\n" +
+				"Claude will be able to execute any tool (shell commands, file\n" +
+				"writes, etc.) without asking for your confirmation.\n\n" +
+				"Only enable this if you trust the environment and understand\n" +
+				"the risks.")
+		hint := dimStyle.Render("y confirm  │  n/esc cancel")
+		return modalStyle.Render(strings.Join([]string{title, "", warning, "", hint}, "\n"))
 
 	case modalComment:
 		title := titleStyle.Render(fmt.Sprintf("Comment on #%d", m.modalIssue))
@@ -1250,7 +1342,13 @@ func (m model) renderStatusBar() string {
 		keys = []string{"j/k navigate", "space toggle", "ctrl+d submit", "esc cancel"}
 	case modalBrowser, modalWorktree, modalClaudeTask:
 		keys = []string{"esc dismiss"}
+	case modalPermissionWarning:
+		keys = []string{"y confirm", "n/esc cancel"}
 	default:
+		permLabel := "p permissions:off"
+		if m.settings.DangerouslySkipPermissions {
+			permLabel = "p permissions:ON"
+		}
 		keys = []string{
 			"↑↓/jk navigate",
 			"tab switch panel",
@@ -1259,6 +1357,7 @@ func (m model) renderStatusBar() string {
 			"c comment",
 			"w/W worktree/split",
 			"s/S claude/split",
+			permLabel,
 			"l labels",
 			"n new issue",
 			"q quit",
