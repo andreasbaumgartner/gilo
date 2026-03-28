@@ -170,17 +170,33 @@ type model struct {
 	labelCursor   int
 
 	tmuxPanes []TmuxPane
+
+	stateFilter string // "OPEN", "CLOSED", or "" (all)
 }
 
 func initialModel() model {
 	w, h, _ := term.GetSize(0)
 	vp := viewport.New(0, 0)
 	return model{
-		width:    w,
-		height:   h,
-		viewport: vp,
-		modal:    modalNone,
+		width:       w,
+		height:      h,
+		viewport:    vp,
+		modal:       modalNone,
+		stateFilter: "OPEN",
 	}
+}
+
+func (m model) filteredIssues() []Issue {
+	if m.stateFilter == "" {
+		return m.issues
+	}
+	var out []Issue
+	for _, issue := range m.issues {
+		if issue.State == m.stateFilter {
+			out = append(out, issue)
+		}
+	}
+	return out
 }
 
 // ── Commands ──────────────────────────────────────────────────────────────────
@@ -530,6 +546,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case issuesLoadedMsg:
 		m.issues = []Issue(msg)
 		m.loaded = true
+		filtered := m.filteredIssues()
+		if m.cursor >= len(filtered) {
+			m.cursor = max(0, len(filtered)-1)
+		}
 		m.updateViewport()
 
 	case errMsg:
@@ -771,7 +791,8 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "j", "down":
 		if m.focus == focusList {
-			if m.cursor < len(m.issues)-1 {
+			filtered := m.filteredIssues()
+			if m.cursor < len(filtered)-1 {
 				m.cursor++
 				m.updateViewport()
 			}
@@ -790,9 +811,10 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "enter", "o":
-		if len(m.issues) > 0 {
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
 			m.modal = modalBrowser
-			m.modalIssue = m.issues[m.cursor].Number
+			m.modalIssue = filtered[m.cursor].Number
 			m.modalStatus = ""
 			num := m.modalIssue
 			return m, func() tea.Msg {
@@ -803,8 +825,9 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "w", "W":
-		if len(m.issues) > 0 {
-			issue := m.issues[m.cursor]
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
+			issue := filtered[m.cursor]
 			m.modal = modalWorktree
 			m.modalIssue = issue.Number
 			m.modalStatus = ""
@@ -812,8 +835,9 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "s", "S":
-		if len(m.issues) > 0 {
-			issue := m.issues[m.cursor]
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
+			issue := filtered[m.cursor]
 			m.modal = modalClaudeTask
 			m.modalIssue = issue.Number
 			m.modalStatus = ""
@@ -821,9 +845,10 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "c":
-		if len(m.issues) > 0 {
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
 			m.modal = modalComment
-			m.modalIssue = m.issues[m.cursor].Number
+			m.modalIssue = filtered[m.cursor].Number
 			m.modalStatus = ""
 			ta := textarea.New()
 			ta.Placeholder = "Write your comment..."
@@ -854,14 +879,30 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.textareaBody = tb
 
 	case "l":
-		if len(m.issues) > 0 {
-			issue := m.issues[m.cursor]
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
+			issue := filtered[m.cursor]
 			m.modal = modalLabel
 			m.modalIssue = issue.Number
 			m.modalStatus = "Loading labels..."
 			m.labelCursor = 0
 			return m, fetchLabelsCmd(issue)
 		}
+
+	case "f":
+		switch m.stateFilter {
+		case "OPEN":
+			m.stateFilter = "CLOSED"
+		case "CLOSED":
+			m.stateFilter = ""
+		default:
+			m.stateFilter = "OPEN"
+		}
+		filtered := m.filteredIssues()
+		if m.cursor >= len(filtered) {
+			m.cursor = max(0, len(filtered)-1)
+		}
+		m.updateViewport()
 	}
 
 	return m, nil
@@ -1012,20 +1053,28 @@ func (m model) renderList() string {
 	innerW := m.listInnerW()
 	innerH := m.mainH() - 2
 
-	header := titleStyle.Render("Issues")
+	filterLabel := "Open"
+	if m.stateFilter == "CLOSED" {
+		filterLabel = "Closed"
+	} else if m.stateFilter == "" {
+		filterLabel = "All"
+	}
+
+	header := titleStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]")
 	if !active {
-		header = dimStyle.Render("Issues")
+		header = dimStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]")
 	}
 
 	var rows []string
 	rows = append(rows, header, "")
 
+	filtered := m.filteredIssues()
 	if !m.loaded {
 		rows = append(rows, "  "+dimStyle.Render("Loading..."))
-	} else if len(m.issues) == 0 {
-		rows = append(rows, "  "+dimStyle.Render("No open issues found."))
+	} else if len(filtered) == 0 {
+		rows = append(rows, "  "+dimStyle.Render("No "+strings.ToLower(filterLabel)+" issues found."))
 	} else {
-		for i, issue := range m.issues {
+		for i, issue := range filtered {
 			if len(rows) >= innerH {
 				break
 			}
@@ -1081,11 +1130,12 @@ func (m model) renderDetail() string {
 }
 
 func (m model) renderDetailContent() string {
-	if !m.loaded || len(m.issues) == 0 {
+	filtered := m.filteredIssues()
+	if !m.loaded || len(filtered) == 0 {
 		return dimStyle.Render("No issue selected.")
 	}
 
-	issue := m.issues[m.cursor]
+	issue := filtered[m.cursor]
 	w := m.detailInnerW()
 
 	stateColor := greenStyle
@@ -1172,6 +1222,7 @@ func (m model) renderStatusBar() string {
 		keys = []string{
 			"↑↓/jk navigate",
 			"tab switch panel",
+			"f filter state",
 			"o open in browser",
 			"c comment",
 			"w/W worktree/split",
