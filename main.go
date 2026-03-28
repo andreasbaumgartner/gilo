@@ -298,6 +298,14 @@ func ensureWorktree(issue Issue) (branch, worktreePath string, existed bool, err
 		return branch, worktreePath, true, nil
 	}
 
+	// Prune stale worktree references (e.g. manually deleted directories)
+	exec.Command("git", "worktree", "prune").Run()
+
+	// Remove leftover directory that isn't a valid worktree
+	if info, serr := os.Stat(worktreePath); serr == nil && info.IsDir() {
+		os.RemoveAll(worktreePath)
+	}
+
 	os.MkdirAll(filepath.Dir(worktreePath), 0o755)
 
 	out, addErr := exec.Command("git", "worktree", "add", "-b", branch, worktreePath).CombinedOutput()
@@ -332,7 +340,13 @@ func createClaudeTaskCmd(issue Issue, split bool) tea.Cmd {
 
 func worktreeExists(path string) bool {
 	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
+	if err != nil || !info.IsDir() {
+		return false
+	}
+	// Verify it's a valid git worktree (has a .git file, not just a directory)
+	gitPath := filepath.Join(path, ".git")
+	gi, gerr := os.Stat(gitPath)
+	return gerr == nil && !gi.IsDir()
 }
 
 func openWorktreeInTmux(branch, worktreePath string, existed bool, split bool) worktreeCreatedMsg {
