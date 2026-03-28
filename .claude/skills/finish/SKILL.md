@@ -20,7 +20,7 @@ Determine the main repository path: the worktree lives at `{repo_parent}/.worktr
 
 Run `git status --porcelain`. If there are any changes (staged, unstaged, or untracked):
 - Stage all relevant changes with `git add -A`
-- Create a commit with an appropriate message describing the changes
+- Create a commit with an appropriate message describing the changes (do NOT add a Co-Authored-By trailer)
 - If unsure what the changes are, run `git diff --staged --stat` to summarize them
 
 If the working tree is clean, skip this step.
