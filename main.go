@@ -48,6 +48,18 @@ var (
 	greenStyle  = lipgloss.NewStyle().Foreground(colorGreen)
 	redStyle    = lipgloss.NewStyle().Foreground(colorRed)
 
+	openBadge = lipgloss.NewStyle().
+			Background(lipgloss.Color("22")).
+			Foreground(lipgloss.Color("10")).
+			Bold(true).
+			Padding(0, 1)
+
+	closedBadge = lipgloss.NewStyle().
+			Background(lipgloss.Color("52")).
+			Foreground(lipgloss.Color("9")).
+			Bold(true).
+			Padding(0, 1)
+
 	keybindStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("236")).
 			Foreground(lipgloss.Color("252")).
@@ -1079,9 +1091,9 @@ func (m model) renderList() string {
 				break
 			}
 
-			stateIcon := greenStyle.Render("● ")
+			stateBadge := openBadge.Render("OPEN")
 			if issue.State == "CLOSED" {
-				stateIcon = redStyle.Render("● ")
+				stateBadge = closedBadge.Render("CLOSED")
 			}
 
 			tmuxIndicator := ""
@@ -1092,14 +1104,20 @@ func (m model) renderList() string {
 				}
 			}
 
+			// Fixed badge column: align titles regardless of OPEN/CLOSED
+			pad := ""
+			if issue.State != "CLOSED" {
+				pad = "  " // extra spaces so OPEN aligns with CLOSED
+			}
+
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-12)
-			line := stateIcon + num + " " + title + tmuxIndicator
+			title := truncate(issue.Title, innerW-20)
+			line := stateBadge + pad + " " + num + " " + title + tmuxIndicator
 
 			if i == m.cursor {
 				if active {
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-12))
-					line = stateIcon + selectedStyle.Render(padRight(rest, innerW-2)) + tmuxIndicator
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-20))
+					line = stateBadge + pad + " " + selectedStyle.Render(padRight(rest, innerW-12)) + tmuxIndicator
 				} else {
 					line = lipgloss.NewStyle().
 						Foreground(lipgloss.Color("252")).
