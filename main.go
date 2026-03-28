@@ -7,7 +7,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -131,6 +133,15 @@ type claudeTaskCreatedMsg struct {
 	split   bool // true if opened as a split pane
 }
 
+type TmuxPane struct {
+	WindowName string
+	IssueNum   int
+	LastLine   string
+}
+
+type tmuxStatusMsg []TmuxPane
+type tmuxTickMsg struct{}
+
 // ── Model ─────────────────────────────────────────────────────────────────────
 
 type model struct {
@@ -157,6 +168,8 @@ type model struct {
 	labelSelected map[string]bool
 	labelOriginal map[string]bool
 	labelCursor   int
+
+	tmuxPanes []TmuxPane
 }
 
 func initialModel() model {
@@ -171,6 +184,61 @@ func initialModel() model {
 }
 
 // ── Commands ──────────────────────────────────────────────────────────────────
+
+var issueWindowRe = regexp.MustCompile(`^issue-(\d+)-`)
+
+func tmuxTickCmd() tea.Cmd {
+	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
+		return tmuxTickMsg{}
+	})
+}
+
+func fetchTmuxStatus() tea.Msg {
+	if _, err := exec.LookPath("tmux"); err != nil {
+		return tmuxStatusMsg(nil)
+	}
+
+	var windowNames []string
+	if os.Getenv("TMUX") != "" {
+		out, err := exec.Command("tmux", "list-windows", "-F", "#{window_name}").Output()
+		if err == nil {
+			windowNames = strings.Split(strings.TrimSpace(string(out)), "\n")
+		}
+	} else {
+		out, err := exec.Command("tmux", "list-windows", "-a", "-F", "#{window_name}").Output()
+		if err == nil {
+			windowNames = strings.Split(strings.TrimSpace(string(out)), "\n")
+		}
+	}
+
+	var panes []TmuxPane
+	for _, name := range windowNames {
+		m := issueWindowRe.FindStringSubmatch(name)
+		if m == nil {
+			continue
+		}
+		issueNum, _ := strconv.Atoi(m[1])
+
+		var lastLine string
+		out, err := exec.Command("tmux", "capture-pane", "-t", name, "-p").Output()
+		if err == nil {
+			lines := strings.Split(string(out), "\n")
+			for i := len(lines) - 1; i >= 0; i-- {
+				if l := strings.TrimSpace(lines[i]); l != "" {
+					lastLine = l
+					break
+				}
+			}
+		}
+
+		panes = append(panes, TmuxPane{
+			WindowName: name,
+			IssueNum:   issueNum,
+			LastLine:   lastLine,
+		})
+	}
+	return tmuxStatusMsg(panes)
+}
 
 func fetchIssues() tea.Msg {
 	out, err := exec.Command("gh", "issue", "list",
@@ -436,7 +504,7 @@ func applyLabelChanges(issueNum int, toAdd, toRemove []string) tea.Cmd {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 func (m model) Init() tea.Cmd {
-	return fetchIssues
+	return tea.Batch(fetchIssues, tmuxTickCmd())
 }
 
 // ── Update ────────────────────────────────────────────────────────────────────
@@ -449,6 +517,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.viewport.Width = m.detailInnerW()
 		m.viewport.Height = m.detailInnerH()
+
+	case tmuxTickMsg:
+		return m, tea.Batch(fetchTmuxStatus, tmuxTickCmd())
+
+	case tmuxStatusMsg:
+		m.tmuxPanes = []TmuxPane(msg)
+		if m.loaded && len(m.issues) > 0 {
+			m.updateViewport()
+		}
 
 	case issuesLoadedMsg:
 		m.issues = []Issue(msg)
@@ -958,14 +1035,22 @@ func (m model) renderList() string {
 				stateIcon = redStyle.Render("● ")
 			}
 
+			tmuxIndicator := ""
+			for _, p := range m.tmuxPanes {
+				if p.IssueNum == issue.Number {
+					tmuxIndicator = yellowStyle.Render(" ⟳")
+					break
+				}
+			}
+
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-10)
-			line := stateIcon + num + " " + title
+			title := truncate(issue.Title, innerW-12)
+			line := stateIcon + num + " " + title + tmuxIndicator
 
 			if i == m.cursor {
 				if active {
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-10))
-					line = stateIcon + selectedStyle.Render(padRight(rest, innerW-2))
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-12))
+					line = stateIcon + selectedStyle.Render(padRight(rest, innerW-2)) + tmuxIndicator
 				} else {
 					line = lipgloss.NewStyle().
 						Foreground(lipgloss.Color("252")).
@@ -1029,6 +1114,19 @@ func (m model) renderDetailContent() string {
 		b.WriteString(dimStyle.Render("Labels:  ") + yellowStyle.Render(strings.Join(names, ", ")) + "\n")
 	}
 
+	// Tmux status
+	for _, p := range m.tmuxPanes {
+		if p.IssueNum == issue.Number {
+			b.WriteString("\n")
+			b.WriteString(dimStyle.Render("── Tmux ") + dimStyle.Render(strings.Repeat("─", max(0, w-10))) + "\n\n")
+			b.WriteString("  " + yellowStyle.Render("Window: ") + p.WindowName + "\n")
+			if p.LastLine != "" {
+				b.WriteString("  " + yellowStyle.Render("Output: ") + truncate(p.LastLine, w-12) + "\n")
+			}
+			break
+		}
+	}
+
 	// Body
 	b.WriteString("\n")
 	b.WriteString(dimStyle.Render("── Description ") + dimStyle.Render(strings.Repeat("─", max(0, w-17))) + "\n\n")
@@ -1082,6 +1180,9 @@ func (m model) renderStatusBar() string {
 			"n new issue",
 			"q quit",
 		}
+	}
+	if m.modal == modalNone && len(m.tmuxPanes) > 0 {
+		keys = append([]string{fmt.Sprintf("%d tmux ⟳", len(m.tmuxPanes))}, keys...)
 	}
 	parts := make([]string, len(keys))
 	for i, k := range keys {
