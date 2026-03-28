@@ -1,0 +1,348 @@
+package tui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
+
+func (m model) View() string {
+	if m.err != nil {
+		return fmt.Sprintf(
+			"\n  Error: %v\n\n  Make sure 'gh' is installed and authenticated.\n  Press q to quit.\n",
+			m.err,
+		)
+	}
+
+	left := m.renderList()
+	right := m.renderDetail()
+	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
+	screen := body + "\n" + m.renderStatusBar()
+
+	if m.modal != modalNone {
+		modal := m.renderModal()
+		screen = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, modal,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
+		)
+
+		lines := strings.Split(screen, "\n")
+		for len(lines) < m.height {
+			lines = append(lines, "")
+		}
+		lines[m.height-1] = m.renderStatusBar()
+		screen = strings.Join(lines, "\n")
+	}
+
+	return screen
+}
+
+// Modal
+
+func (m model) renderModal() string {
+	switch m.modal {
+	case modalBrowser:
+		content := fmt.Sprintf("Opening issue #%d in browser...", m.modalIssue)
+		if m.modalStatus != "" {
+			content = m.modalStatus
+		}
+		hint := dimStyle.Render("esc dismiss")
+		return modalStyle.Render(content + "\n\n" + hint)
+
+	case modalWorktree:
+		title := titleStyle.Render(fmt.Sprintf("Worktree for #%d", m.modalIssue))
+		hint := dimStyle.Render("esc dismiss")
+		content := "Setting up worktree..."
+		if m.modalStatus != "" {
+			content = m.modalStatus
+		}
+		return modalStyle.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
+
+	case modalClaudeTask:
+		title := titleStyle.Render(fmt.Sprintf("Claude Task for #%d", m.modalIssue))
+		hint := dimStyle.Render("esc dismiss")
+		content := "Setting up worktree and starting Claude..."
+		if m.modalStatus != "" {
+			content = m.modalStatus
+		}
+		if m.settings.DangerouslySkipPermissions {
+			content += "\n\n" + lipgloss.NewStyle().Foreground(colorYellow).Render("⚡ Running with --dangerously-skip-permissions")
+		}
+		return modalStyle.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
+
+	case modalPermissionWarning:
+		title := titleStyle.Render("⚠ Enable All Permissions")
+		warning := lipgloss.NewStyle().Foreground(colorYellow).Render(
+			"WARNING: This will run Claude with --dangerously-skip-permissions.\n\n" +
+				"Claude will be able to execute any tool (shell commands, file\n" +
+				"writes, etc.) without asking for your confirmation.\n\n" +
+				"Only enable this if you trust the environment and understand\n" +
+				"the risks.")
+		hint := dimStyle.Render("y confirm  │  n/esc cancel")
+		return modalStyle.Render(strings.Join([]string{title, "", warning, "", hint}, "\n"))
+
+	case modalComment:
+		title := titleStyle.Render(fmt.Sprintf("Comment on #%d", m.modalIssue))
+		hint := dimStyle.Render("ctrl+d submit  │  esc cancel")
+		var body string
+		if m.modalStatus != "" {
+			body = m.modalStatus
+		} else {
+			body = m.textarea.View()
+		}
+		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
+	case modalCreate:
+		title := titleStyle.Render("Create New Issue")
+		hint := dimStyle.Render("tab switch field  │  ctrl+d submit  │  esc cancel")
+		var body string
+		if m.modalStatus != "" {
+			body = m.modalStatus
+		} else {
+			body = strings.Join([]string{
+				dimStyle.Render("Title:"),
+				m.textarea.View(),
+				"",
+				dimStyle.Render("Body:"),
+				m.textareaBody.View(),
+			}, "\n")
+		}
+		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
+	case modalLabel:
+		title := titleStyle.Render(fmt.Sprintf("Labels for #%d", m.modalIssue))
+		hint := dimStyle.Render("j/k navigate  │  space toggle  │  ctrl+d submit  │  esc cancel")
+		var body string
+		if m.modalStatus != "" {
+			body = m.modalStatus
+		} else if len(m.repoLabels) == 0 {
+			body = dimStyle.Render("No labels found in this repository.")
+		} else {
+			var rows []string
+			for i, l := range m.repoLabels {
+				check := "[ ]"
+				if m.labelSelected[l.Name] {
+					check = "[x]"
+				}
+				labelColor := lipgloss.NewStyle().Foreground(lipgloss.Color("#" + l.Color))
+				line := fmt.Sprintf(" %s %s", check, labelColor.Render(l.Name))
+				if i == m.labelCursor {
+					line = selectedStyle.Render(fmt.Sprintf(" %s %s", check, l.Name))
+				}
+				rows = append(rows, line)
+			}
+			body = strings.Join(rows, "\n")
+		}
+		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+	}
+	return ""
+}
+
+// List panel
+
+func (m model) renderList() string {
+	active := m.focus == focusList
+	innerW := m.listInnerW()
+	innerH := m.mainH() - 2
+
+	filterLabel := "Open"
+	if m.stateFilter == "CLOSED" {
+		filterLabel = "Closed"
+	} else if m.stateFilter == "" {
+		filterLabel = "All"
+	}
+
+	header := titleStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]")
+	if !active {
+		header = dimStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]")
+	}
+
+	var rows []string
+	rows = append(rows, header, "")
+
+	filtered := m.filteredIssues()
+	if !m.loaded {
+		rows = append(rows, "  "+dimStyle.Render("Loading..."))
+	} else if len(filtered) == 0 {
+		rows = append(rows, "  "+dimStyle.Render("No "+strings.ToLower(filterLabel)+" issues found."))
+	} else {
+		for i, issue := range filtered {
+			if len(rows) >= innerH {
+				break
+			}
+
+			stateBadge := openBadge.Render("OPEN")
+			if issue.State == "CLOSED" {
+				stateBadge = closedBadge.Render("CLOSED")
+			}
+
+			tmuxIndicator := ""
+			for _, p := range m.tmuxPanes {
+				if p.IssueNum == issue.Number {
+					tmuxIndicator = yellowStyle.Render(" ⟳")
+					break
+				}
+			}
+
+			pad := ""
+			if issue.State != "CLOSED" {
+				pad = "  "
+			}
+
+			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
+			title := truncate(issue.Title, innerW-20)
+			line := stateBadge + pad + " " + num + " " + title + tmuxIndicator
+
+			if i == m.cursor {
+				if active {
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-20))
+					line = stateBadge + pad + " " + selectedStyle.Render(padRight(rest, innerW-12)) + tmuxIndicator
+				} else {
+					line = lipgloss.NewStyle().
+						Foreground(lipgloss.Color("252")).
+						Render(line)
+				}
+			}
+			rows = append(rows, line)
+		}
+	}
+
+	content := strings.Join(rows, "\n")
+	return panelBorder(active).
+		Width(m.listW()-2).
+		Height(m.mainH()-2).
+		Padding(0, 1).
+		Render(content)
+}
+
+// Detail panel
+
+func (m model) renderDetail() string {
+	active := m.focus == focusDetail
+	return panelBorder(active).
+		Width(m.detailW()-2).
+		Height(m.mainH()-2).
+		Padding(0, 1).
+		Render(m.viewport.View())
+}
+
+func (m model) renderDetailContent() string {
+	filtered := m.filteredIssues()
+	if !m.loaded || len(filtered) == 0 {
+		return dimStyle.Render("No issue selected.")
+	}
+
+	issue := filtered[m.cursor]
+	w := m.detailInnerW()
+
+	stateColor := greenStyle
+	if issue.State == "CLOSED" {
+		stateColor = redStyle
+	}
+
+	var b strings.Builder
+
+	b.WriteString(titleStyle.Render(fmt.Sprintf("#%d  %s", issue.Number, issue.Title)))
+	b.WriteString("\n")
+	b.WriteString(strings.Repeat("─", min(w, 60)))
+	b.WriteString("\n\n")
+
+	b.WriteString(dimStyle.Render("State:   ") + stateColor.Render(issue.State) + "\n")
+	b.WriteString(dimStyle.Render("Author:  ") + issue.Author.Login + "\n")
+	b.WriteString(dimStyle.Render("Created: ") + issue.CreatedAt[:10] + "\n")
+
+	if len(issue.Labels) > 0 {
+		names := make([]string, len(issue.Labels))
+		for i, l := range issue.Labels {
+			names[i] = l.Name
+		}
+		b.WriteString(dimStyle.Render("Labels:  ") + yellowStyle.Render(strings.Join(names, ", ")) + "\n")
+	}
+
+	for _, p := range m.tmuxPanes {
+		if p.IssueNum == issue.Number {
+			b.WriteString("\n")
+			b.WriteString(dimStyle.Render("── Tmux ") + dimStyle.Render(strings.Repeat("─", max(0, w-10))) + "\n\n")
+			b.WriteString("  " + yellowStyle.Render("Window: ") + p.WindowName + "\n")
+			if p.LastLine != "" {
+				b.WriteString("  " + yellowStyle.Render("Output: ") + truncate(p.LastLine, w-12) + "\n")
+			}
+			break
+		}
+	}
+
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render("── Description ") + dimStyle.Render(strings.Repeat("─", max(0, w-17))) + "\n\n")
+	if issue.Body == "" {
+		b.WriteString(dimStyle.Render("  (no description)\n"))
+	} else {
+		for _, line := range strings.Split(issue.Body, "\n") {
+			b.WriteString("  " + line + "\n")
+		}
+	}
+
+	if len(issue.Comments) > 0 {
+		b.WriteString("\n")
+		b.WriteString(dimStyle.Render(fmt.Sprintf("── Comments (%d) ", len(issue.Comments))) +
+			dimStyle.Render(strings.Repeat("─", max(0, w-20))) + "\n")
+
+		for _, c := range issue.Comments {
+			b.WriteString("\n")
+			b.WriteString(lipgloss.NewStyle().Bold(true).Render(c.Author.Login))
+			b.WriteString("  " + dimStyle.Render(c.CreatedAt[:10]) + "\n")
+			for _, line := range strings.Split(c.Body, "\n") {
+				b.WriteString("  " + line + "\n")
+			}
+		}
+	}
+
+	return b.String()
+}
+
+// Status bar
+
+func (m model) renderStatusBar() string {
+	var keys []string
+	switch m.modal {
+	case modalComment, modalCreate:
+		keys = []string{"tab switch field", "ctrl+d submit", "esc cancel"}
+	case modalLabel:
+		keys = []string{"j/k navigate", "space toggle", "ctrl+d submit", "esc cancel"}
+	case modalBrowser, modalWorktree, modalClaudeTask:
+		keys = []string{"esc dismiss"}
+	case modalPermissionWarning:
+		keys = []string{"y confirm", "n/esc cancel"}
+	default:
+		permLabel := "p permissions:off"
+		if m.settings.DangerouslySkipPermissions {
+			permLabel = "p permissions:ON"
+		}
+		keys = []string{
+			"↑↓/jk navigate",
+			"tab switch panel",
+			"f filter state",
+			"o open in browser",
+			"c comment",
+			"w/W worktree/split",
+			"s/S claude/split",
+			permLabel,
+			"l labels",
+			"n new issue",
+			"q quit",
+		}
+	}
+	if m.modal == modalNone && len(m.tmuxPanes) > 0 {
+		keys = append([]string{fmt.Sprintf("%d tmux ⟳", len(m.tmuxPanes))}, keys...)
+	}
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = keybindStyle.Render(k)
+	}
+	bar := strings.Join(parts, " ")
+	barW := lipgloss.Width(bar)
+	if barW < m.width {
+		bar += strings.Repeat(" ", m.width-barW)
+	}
+	return bar
+}
