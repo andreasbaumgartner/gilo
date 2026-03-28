@@ -366,7 +366,7 @@ func openWorktreeInTmux(branch, worktreePath string, existed bool, split bool) w
 
 		if split {
 			// Create a split pane instead of a new window
-			tmuxErr := exec.Command("tmux", "split-window", "-h", "-c", worktreePath).Run()
+			tmuxErr := exec.Command("tmux", "split-window", "-h", "-d", "-c", worktreePath).Run()
 			if tmuxErr != nil {
 				return worktreeCreatedMsg{
 					err:    fmt.Errorf("worktree ready but tmux split-window failed: %w", tmuxErr),
@@ -377,7 +377,7 @@ func openWorktreeInTmux(branch, worktreePath string, existed bool, split bool) w
 		}
 
 		// No existing window — create a new one
-		tmuxErr := exec.Command("tmux", "new-window", "-n", branch, "-c", worktreePath).Run()
+		tmuxErr := exec.Command("tmux", "new-window", "-d", "-n", branch, "-c", worktreePath).Run()
 		if tmuxErr != nil {
 			return worktreeCreatedMsg{
 				err:    fmt.Errorf("worktree ready but tmux new-window failed: %w", tmuxErr),
