@@ -18,6 +18,12 @@ func tmuxTickCmd() tea.Cmd {
 	})
 }
 
+func refreshTickCmd() tea.Cmd {
+	return tea.Tick(30*time.Second, func(t time.Time) tea.Msg {
+		return refreshTickMsg{}
+	})
+}
+
 func fetchTmuxStatusCmd() tea.Msg {
 	return tmuxStatusMsg(tmux.FetchStatus())
 }

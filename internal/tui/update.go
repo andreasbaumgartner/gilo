@@ -23,6 +23,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tmuxTickMsg:
 		return m, tea.Batch(fetchTmuxStatusCmd, tmuxTickCmd())
 
+	case refreshTickMsg:
+		m.refreshing = true
+		return m, tea.Batch(fetchIssuesCmd, refreshTickCmd())
+
 	case tmuxStatusMsg:
 		m.tmuxPanes = msg
 		if m.loaded && len(m.issues) > 0 {
@@ -32,6 +36,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case issuesLoadedMsg:
 		m.issues = []github.Issue(msg)
 		m.loaded = true
+		m.refreshing = false
 		filtered := m.filteredIssues()
 		if m.cursor >= len(filtered) {
 			m.cursor = max(0, len(filtered)-1)
@@ -40,6 +45,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case errMsg:
 		m.err = msg.err
+		m.refreshing = false
 
 	case browserOpenedMsg:
 		if msg.err != nil {
@@ -395,6 +401,12 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modalStatus = "Loading labels..."
 			m.labelCursor = 0
 			return m, fetchLabelsCmd(issue)
+		}
+
+	case "g":
+		if !m.refreshing {
+			m.refreshing = true
+			return m, fetchIssuesCmd
 		}
 
 	case "f":

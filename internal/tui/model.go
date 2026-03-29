@@ -31,6 +31,7 @@ type claudeTaskCreatedMsg struct {
 }
 type tmuxStatusMsg []tmux.Pane
 type tmuxTickMsg struct{}
+type refreshTickMsg struct{}
 
 // Focus
 
@@ -85,6 +86,8 @@ type model struct {
 
 	tmuxPanes []tmux.Pane
 
+	refreshing bool
+
 	stateFilter string
 
 	settings settings.Settings
@@ -117,7 +120,7 @@ func (m model) filteredIssues() []github.Issue {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(fetchIssuesCmd, tmuxTickCmd())
+	return tea.Batch(fetchIssuesCmd, tmuxTickCmd(), refreshTickCmd())
 }
 
 // Run starts the TUI application.
