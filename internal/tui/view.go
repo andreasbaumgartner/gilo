@@ -186,9 +186,14 @@ func (m model) renderList() string {
 		filterLabel = "All"
 	}
 
-	header := titleStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]")
+	refreshIndicator := ""
+	if m.refreshing {
+		refreshIndicator = " " + yellowStyle.Render("⟳")
+	}
+
+	header := titleStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]") + refreshIndicator
 	if !active {
-		header = dimStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]")
+		header = dimStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]") + refreshIndicator
 	}
 
 	var rows []string
@@ -357,6 +362,7 @@ func (m model) renderStatusBar() string {
 			"↑↓/jk navigate",
 			"tab switch panel",
 			"f filter state",
+			"g refresh",
 			"o open in browser",
 			"c comment",
 			"w/W worktree/split",
