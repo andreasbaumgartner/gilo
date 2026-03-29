@@ -28,7 +28,8 @@
       "Bash(chown -R devuser:devuser /workspaces/gilo)",
       "Bash(git config:*)",
       "Bash(curl:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(find /workspaces/gilo -type f \\\\\\(-name *.md -o -name *.json -o -name go.mod -o -name *.yaml -o -name *.yml \\\\\\))"
     ]
   }
 }

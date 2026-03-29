@@ -9,6 +9,7 @@ import (
 type Settings struct {
 	DangerouslySkipPermissions bool `json:"dangerously_skip_permissions"`
 	PermissionWarningAcked     bool `json:"permission_warning_acked"`
+	AllowRoot                  bool `json:"allow_root"`
 }
 
 func path() string {
