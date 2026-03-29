@@ -273,13 +273,13 @@ func (m model) renderList() string {
 			}
 
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-20-statusColWidth)
+			title := truncate(issue.Title, innerW-15-statusColWidth)
 			line := stateBadge + pad + statusCol + " " + num + " " + title
 
 			if i == m.cursor {
 				if active {
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-20-statusColWidth))
-					line = stateBadge + pad + statusCol + " " + selectedStyle.Render(padRight(rest, innerW-12-statusColWidth))
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-15-statusColWidth))
+					line = stateBadge + pad + statusCol + " " + selectedStyle.Render(padRight(rest, innerW-9-statusColWidth))
 				} else {
 					line = lipgloss.NewStyle().
 						Foreground(activeScheme.UnfocusedSelected).
