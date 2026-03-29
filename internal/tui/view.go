@@ -238,10 +238,32 @@ func (m model) renderList() string {
 	} else if len(filtered) == 0 {
 		rows = append(rows, "  "+dimStyle.Render("No "+strings.ToLower(filterLabel)+" issues found."))
 	} else {
-		for i, issue := range filtered {
-			if len(rows) >= innerH {
-				break
-			}
+		visibleRows := innerH - len(rows)
+		start := m.listOffset
+
+		// Reserve space for scroll indicators
+		if start > 0 {
+			visibleRows--
+		}
+		if start+visibleRows < len(filtered) {
+			visibleRows--
+		}
+		if visibleRows < 1 {
+			visibleRows = 1
+		}
+
+		end := start + visibleRows
+		if end > len(filtered) {
+			end = len(filtered)
+		}
+
+		if start > 0 {
+			rows = append(rows, dimStyle.Render(fmt.Sprintf("  ↑ %d more issue(s)", start)))
+		}
+
+		for idx := start; idx < end; idx++ {
+			i := idx
+			issue := filtered[idx]
 
 			stateBadge := openBadge.Render("OPEN")
 			if issue.State == "CLOSED" {
@@ -287,6 +309,11 @@ func (m model) renderList() string {
 				}
 			}
 			rows = append(rows, line)
+		}
+
+		if end < len(filtered) {
+			remaining := len(filtered) - end
+			rows = append(rows, dimStyle.Render(fmt.Sprintf("  ↓ %d more issue(s)", remaining)))
 		}
 	}
 
