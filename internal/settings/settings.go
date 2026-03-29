@@ -7,8 +7,9 @@ import (
 )
 
 type Settings struct {
-	DangerouslySkipPermissions bool `json:"dangerously_skip_permissions"`
-	PermissionWarningAcked     bool `json:"permission_warning_acked"`
+	DangerouslySkipPermissions bool   `json:"dangerously_skip_permissions"`
+	PermissionWarningAcked     bool   `json:"permission_warning_acked"`
+	ColorScheme                string `json:"color_scheme,omitempty"`
 }
 
 func path() string {

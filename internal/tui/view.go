@@ -26,7 +26,7 @@ func (m model) View() string {
 		modal := m.renderModal()
 		screen = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, modal,
 			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
+			lipgloss.WithWhitespaceForeground(activeScheme.OverlayBg),
 		)
 
 		lines := strings.Split(screen, "\n")
@@ -174,6 +174,7 @@ func (m model) renderModal() string {
 			dimStyle.Render("── Settings ──"),
 			"  p         Toggle skip-permissions",
 			"  r         Toggle allow-root",
+			"  t         Cycle color scheme",
 			"",
 			dimStyle.Render("── General ──"),
 			"  ?         Show this help",
@@ -260,7 +261,7 @@ func (m model) renderList() string {
 					line = stateBadge + pad + statusCol + " " + selectedStyle.Render(padRight(rest, innerW-12-statusColWidth))
 				} else {
 					line = lipgloss.NewStyle().
-						Foreground(lipgloss.Color("252")).
+						Foreground(activeScheme.UnfocusedSelected).
 						Render(line)
 				}
 			}
@@ -397,6 +398,7 @@ func (m model) renderStatusBar() string {
 			"w/W worktree/split",
 			"s/S claude/split",
 			permLabel,
+			"t theme:" + activeScheme.Name,
 			"l labels",
 			"d delete",
 			"n new issue",
