@@ -35,6 +35,10 @@ type worktreeCreatedMsg struct {
 type claudeTaskCreatedMsg struct {
 	tmux.ClaudeResult
 }
+type tmuxJumpMsg struct {
+	windowName string
+	ok         bool
+}
 type tmuxStatusMsg []tmux.Pane
 type tmuxTickMsg struct{}
 type refreshTickMsg struct{}

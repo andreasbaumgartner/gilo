@@ -9,6 +9,7 @@ import (
 
 	"github.com/andreasbaumgartner/gilo/internal/github"
 	"github.com/andreasbaumgartner/gilo/internal/settings"
+	"github.com/andreasbaumgartner/gilo/internal/tmux"
 )
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -31,6 +32,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tmuxPanes = msg
 		if m.loaded && len(m.issues) > 0 {
 			m.updateViewport()
+		}
+
+	case tmuxJumpMsg:
+		if msg.ok {
+			m.modal = modalNone
+			m.modalStatus = ""
+		} else {
+			m.modalStatus = fmt.Sprintf("Failed to switch to tmux window: %s", msg.windowName)
 		}
 
 	case issuesLoadedMsg:
@@ -370,7 +379,34 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.viewport.ScrollUp(1)
 		}
 
-	case "enter", "o":
+	case "enter":
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
+			issue := filtered[m.cursor]
+			// If a tmux session exists for this issue, jump to it.
+			for _, p := range m.tmuxPanes {
+				if p.IssueNum == issue.Number {
+					windowName := p.WindowName
+					m.modal = modalWorktree
+					m.modalIssue = issue.Number
+					m.modalStatus = "Jumping to tmux window..."
+					return m, func() tea.Msg {
+						ok := tmux.SelectWindow(windowName)
+						return tmuxJumpMsg{windowName: windowName, ok: ok}
+					}
+				}
+			}
+			// No tmux session — fall back to opening in browser.
+			m.modal = modalBrowser
+			m.modalIssue = issue.Number
+			m.modalStatus = ""
+			num := m.modalIssue
+			return m, func() tea.Msg {
+				return browserOpenedMsg{github.OpenInBrowser(num)}
+			}
+		}
+
+	case "o":
 		filtered := m.filteredIssues()
 		if len(filtered) > 0 {
 			m.modal = modalBrowser
