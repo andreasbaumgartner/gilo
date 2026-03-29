@@ -113,12 +113,22 @@ func FetchStatus() []Pane {
 }
 
 // isClaudeIdle checks if the captured pane content indicates that Claude Code
-// has finished processing and is waiting for user input. When idle, Claude
-// shows an input prompt box at the bottom of the terminal:
+// has finished processing and is waiting for user input. Claude shows either:
+//
+// 1. A bordered input prompt box:
 //
 //	╭─────────────────────╮
 //	│ >                   │
 //	╰─────────────────────╯
+//
+// 2. A numbered selection prompt (e.g. for file edit confirmations):
+//
+//	Do you want to make this edit to file.go?
+//	❯ 1. Yes
+//	  2. Yes, allow all edits during this session (shift+tab)
+//	  3. No
+//
+//	Esc to cancel · Tab to amend
 func isClaudeIdle(output string) bool {
 	if output == "" {
 		return false
@@ -128,7 +138,7 @@ func isClaudeIdle(output string) bool {
 
 	// Collect last non-empty lines from the bottom of the pane.
 	var lastLines []string
-	for i := len(lines) - 1; i >= 0 && len(lastLines) < 5; i-- {
+	for i := len(lines) - 1; i >= 0 && len(lastLines) < 10; i-- {
 		if l := strings.TrimSpace(lines[i]); l != "" {
 			lastLines = append(lastLines, l)
 		}
@@ -138,19 +148,22 @@ func isClaudeIdle(output string) bool {
 		return false
 	}
 
-	// The last non-empty line should be the bottom border of the input box.
-	if !strings.HasPrefix(lastLines[0], "╰") || !strings.HasSuffix(lastLines[0], "╯") {
-		return false
+	// Pattern 1: bordered input prompt box.
+	// The last non-empty line is the bottom border ╰...╯ and a line above
+	// is inside the box │...│.
+	if strings.HasPrefix(lastLines[0], "╰") && strings.HasSuffix(lastLines[0], "╯") {
+		for _, line := range lastLines[1:] {
+			if strings.HasPrefix(line, "│") && strings.HasSuffix(line, "│") {
+				return true
+			}
+		}
 	}
 
-	// One of the lines above should be a line inside the input box (bordered
-	// by │ on both sides). We do NOT require ">" because Claude's permission
-	// and question prompts use the same box but show "Yes / No" or other
-	// content instead of a ">" caret.
-	for _, line := range lastLines[1:] {
-		if strings.HasPrefix(line, "│") && strings.HasSuffix(line, "│") {
-			return true
-		}
+	// Pattern 2: numbered selection / confirmation prompt.
+	// The last non-empty line contains "Esc to cancel" and there is a
+	// numbered option line (e.g. "1. Yes") somewhere above it.
+	if strings.Contains(lastLines[0], "Esc to cancel") {
+		return true
 	}
 
 	return false

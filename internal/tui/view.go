@@ -287,7 +287,8 @@ func (m model) renderList() string {
 			}
 
 			// Fixed-width columns for consistent alignment
-			const statusColWidth = 10
+			// " " + longest badge " QUESTION " (10 visual chars) = 11; pad to 12
+			const statusColWidth = 12
 			statusCol := padRight(" "+statusBadge, statusColWidth)
 
 			pad := ""
@@ -465,12 +466,24 @@ func (m model) renderStatusBar() string {
 	if m.modal == modalNone && len(m.tmuxPanes) > 0 {
 		keys = append([]string{fmt.Sprintf("%d tmux ⟳", len(m.tmuxPanes))}, keys...)
 	}
-	parts := make([]string, len(keys))
+	// Build bar, truncating keys that don't fit the terminal width
+	var bar string
+	barW := 0
 	for i, k := range keys {
-		parts[i] = keybindStyle.Render(k)
+		part := keybindStyle.Render(k)
+		partW := lipgloss.Width(part)
+		sep := ""
+		sepW := 0
+		if i > 0 {
+			sep = " "
+			sepW = 1
+		}
+		if barW+sepW+partW > m.width {
+			break
+		}
+		bar += sep + part
+		barW += sepW + partW
 	}
-	bar := strings.Join(parts, " ")
-	barW := lipgloss.Width(bar)
 	if barW < m.width {
 		bar += strings.Repeat(" ", m.width-barW)
 	}

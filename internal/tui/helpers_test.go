@@ -61,7 +61,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("listW", func(t *testing.T) {
 		got := m.listW()
-		want := 38 // 100 * 38 / 100
+		want := 40 // 100*38/100=38, clamped up to listMinW=40
 		if got != want {
 			t.Errorf("listW() = %d, want %d", got, want)
 		}
@@ -69,7 +69,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("detailW", func(t *testing.T) {
 		got := m.detailW()
-		want := 62 // 100 - 38
+		want := 60 // 100 - 40
 		if got != want {
 			t.Errorf("detailW() = %d, want %d", got, want)
 		}
@@ -85,7 +85,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("listInnerW", func(t *testing.T) {
 		got := m.listInnerW()
-		want := 34 // 38 - 4
+		want := 36 // 40 - 4
 		if got != want {
 			t.Errorf("listInnerW() = %d, want %d", got, want)
 		}
@@ -93,7 +93,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("detailInnerW", func(t *testing.T) {
 		got := m.detailInnerW()
-		want := 58 // 62 - 4
+		want := 56 // 60 - 4
 		if got != want {
 			t.Errorf("detailInnerW() = %d, want %d", got, want)
 		}
@@ -106,6 +106,33 @@ func TestLayoutHelpers(t *testing.T) {
 			t.Errorf("detailInnerH() = %d, want %d", got, want)
 		}
 	})
+}
+
+func TestLayoutHelpersDynamic(t *testing.T) {
+	tests := []struct {
+		name       string
+		width      int
+		wantListW  int
+	}{
+		{"narrow terminal", 50, 19},        // 50*38/100=19, terminal too small for min clamp
+		{"medium terminal", 120, 45},        // 120*38/100=45, within bounds
+		{"wide terminal", 250, 80},          // 250*38/100=95, clamped to listMaxW=80
+		{"very narrow", 30, 10},             // 30-20=10
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := model{width: tt.width, height: 40}
+			got := m.listW()
+			if got != tt.wantListW {
+				t.Errorf("listW() with width=%d: got %d, want %d", tt.width, got, tt.wantListW)
+			}
+			// detail should always be width - listW
+			if m.detailW() != tt.width-got {
+				t.Errorf("detailW() with width=%d: got %d, want %d", tt.width, m.detailW(), tt.width-got)
+			}
+		})
+	}
 }
 
 func TestLayoutHelpersZeroSize(t *testing.T) {
