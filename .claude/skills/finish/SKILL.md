@@ -41,20 +41,20 @@ Display the PR URL to the user.
 
 Run `gh issue close {issue_number}`. If the issue is already closed, that is fine — continue.
 
-## Step 6: Remove the worktree
+## Step 6: Remove the worktree and close the tmux window
 
-This step requires leaving the worktree directory first since you cannot remove a worktree while inside it.
-
-Run these commands:
-```
-cd {MAIN_REPO}
-git worktree remove {WORKTREE_PATH} --force
-```
-
-## Step 7: Close the tmux window
+This step requires leaving the worktree directory first since you cannot remove a worktree while inside it. The worktree removal and tmux cleanup MUST run in a single bash command because removing the worktree invalidates the shell's working directory, preventing any subsequent commands from executing.
 
 Check if running inside tmux by checking the `TMUX` environment variable.
 
-If inside tmux, run `tmux kill-window` to close the current window. This returns the user to the gilo TUI window. Note: this will terminate the current Claude session — that is expected and intentional.
+If inside tmux, run this as a single command:
+```
+cd {MAIN_REPO} && git worktree remove {WORKTREE_PATH} --force && tmux kill-window
+```
+The `tmux kill-window` closes the current window and returns the user to the gilo TUI window. Note: this will terminate the current Claude session — that is expected and intentional.
 
-If not inside tmux, inform the user that the finish process is complete and they can close the terminal manually.
+If not inside tmux, run:
+```
+cd {MAIN_REPO} && git worktree remove {WORKTREE_PATH} --force
+```
+Then inform the user that the finish process is complete and they can close the terminal manually.
