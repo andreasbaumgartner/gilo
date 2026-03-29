@@ -38,6 +38,15 @@ func TestIsClaudeIdle(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "claude asking a question (yes/no prompt)",
+			output: "some output\n" +
+				"  Do you want to allow this action?\n" +
+				"╭──────────────────────────────────────────────────────╮\n" +
+				"│ Yes  No                                              │\n" +
+				"╰──────────────────────────────────────────────────────╯\n",
+			want: true,
+		},
+		{
 			name:   "shell prompt not matching",
 			output: "user@host:~$ \n",
 			want:   false,
