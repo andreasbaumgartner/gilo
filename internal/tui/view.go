@@ -26,7 +26,7 @@ func (m model) View() string {
 		modal := m.renderModal()
 		screen = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, modal,
 			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
+			lipgloss.WithWhitespaceForeground(activeScheme.OverlayBg),
 		)
 
 		lines := strings.Split(screen, "\n")
@@ -83,6 +83,23 @@ func (m model) renderModal() string {
 				"the risks.")
 		hint := dimStyle.Render("y confirm  │  n/esc cancel")
 		return modalStyle.Render(strings.Join([]string{title, "", warning, "", hint}, "\n"))
+
+	case modalCloseConfirm:
+		action := "Close"
+		prompt := "Are you sure you want to close this issue?"
+		if m.modalCloseAction == "reopen" {
+			action = "Reopen"
+			prompt = "Are you sure you want to reopen this issue?"
+		}
+		title := titleStyle.Render(fmt.Sprintf("%s Issue #%d", action, m.modalIssue))
+		var body string
+		if m.modalStatus != "" {
+			body = m.modalStatus
+		} else {
+			body = prompt
+		}
+		hint := dimStyle.Render("y confirm  │  n/esc cancel")
+		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
 
 	case modalDeleteConfirm:
 		title := titleStyle.Render(fmt.Sprintf("Delete Issue #%d", m.modalIssue))
@@ -159,9 +176,11 @@ func (m model) renderModal() string {
 			"  f         Cycle filter (Open/Closed/All)",
 			"",
 			dimStyle.Render("── Actions ──"),
-			"  o/enter   Open issue in browser",
+			"  enter     Jump to tmux window / open in browser",
+			"  o         Open issue in browser",
 			"  c         Comment on issue",
 			"  n         Create new issue",
+			"  x         Close/reopen issue",
 			"  d         Delete issue",
 			"  l         Manage labels",
 			"",
@@ -174,6 +193,7 @@ func (m model) renderModal() string {
 			dimStyle.Render("── Settings ──"),
 			"  p         Toggle skip-permissions",
 			"  r         Toggle allow-root",
+			"  t         Cycle color scheme",
 			"",
 			dimStyle.Render("── General ──"),
 			"  ?         Show this help",
@@ -219,10 +239,32 @@ func (m model) renderList() string {
 	} else if len(filtered) == 0 {
 		rows = append(rows, "  "+dimStyle.Render("No "+strings.ToLower(filterLabel)+" issues found."))
 	} else {
-		for i, issue := range filtered {
-			if len(rows) >= innerH {
-				break
-			}
+		visibleRows := innerH - len(rows)
+		start := m.listOffset
+
+		// Reserve space for scroll indicators
+		if start > 0 {
+			visibleRows--
+		}
+		if start+visibleRows < len(filtered) {
+			visibleRows--
+		}
+		if visibleRows < 1 {
+			visibleRows = 1
+		}
+
+		end := start + visibleRows
+		if end > len(filtered) {
+			end = len(filtered)
+		}
+
+		if start > 0 {
+			rows = append(rows, dimStyle.Render(fmt.Sprintf("  ↑ %d more issue(s)", start)))
+		}
+
+		for idx := start; idx < end; idx++ {
+			i := idx
+			issue := filtered[idx]
 
 			stateBadge := openBadge.Render("OPEN")
 			if issue.State == "CLOSED" {
@@ -232,9 +274,12 @@ func (m model) renderList() string {
 			statusBadge := ""
 			for _, p := range m.tmuxPanes {
 				if p.IssueNum == issue.Number {
-					if p.Status == tmux.StatusReview {
+					switch p.Status {
+					case tmux.StatusReview:
 						statusBadge = reviewBadge.Render("REVIEW")
-					} else {
+					case tmux.StatusQuestion:
+						statusBadge = questionBadge.Render("QUESTION")
+					default:
 						statusBadge = workingBadge.Render("WORKING")
 					}
 					break
@@ -242,7 +287,8 @@ func (m model) renderList() string {
 			}
 
 			// Fixed-width columns for consistent alignment
-			const statusColWidth = 10
+			// " " + longest badge " QUESTION " (10 visual chars) = 11; pad to 12
+			const statusColWidth = 12
 			statusCol := padRight(" "+statusBadge, statusColWidth)
 
 			pad := ""
@@ -251,20 +297,25 @@ func (m model) renderList() string {
 			}
 
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-20-statusColWidth)
+			title := truncate(issue.Title, innerW-15-statusColWidth)
 			line := stateBadge + pad + statusCol + " " + num + " " + title
 
 			if i == m.cursor {
 				if active {
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-20-statusColWidth))
-					line = stateBadge + pad + statusCol + " " + selectedStyle.Render(padRight(rest, innerW-12-statusColWidth))
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-15-statusColWidth))
+					line = stateBadge + pad + statusCol + " " + selectedStyle.Render(padRight(rest, innerW-9-statusColWidth))
 				} else {
 					line = lipgloss.NewStyle().
-						Foreground(lipgloss.Color("252")).
+						Foreground(activeScheme.UnfocusedSelected).
 						Render(line)
 				}
 			}
 			rows = append(rows, line)
+		}
+
+		if end < len(filtered) {
+			remaining := len(filtered) - end
+			rows = append(rows, dimStyle.Render(fmt.Sprintf("  ↓ %d more issue(s)", remaining)))
 		}
 	}
 
@@ -324,9 +375,14 @@ func (m model) renderDetailContent() string {
 		if p.IssueNum == issue.Number {
 			b.WriteString("\n")
 			b.WriteString(dimStyle.Render("── Tmux ") + dimStyle.Render(strings.Repeat("─", max(0, w-10))) + "\n\n")
-			statusLabel := workingBadge.Render("WORKING")
-			if p.Status == tmux.StatusReview {
+			var statusLabel string
+			switch p.Status {
+			case tmux.StatusReview:
 				statusLabel = reviewBadge.Render("REVIEW")
+			case tmux.StatusQuestion:
+				statusLabel = questionBadge.Render("QUESTION")
+			default:
+				statusLabel = workingBadge.Render("WORKING")
 			}
 			b.WriteString("  " + yellowStyle.Render("Status: ") + statusLabel + "\n")
 			b.WriteString("  " + yellowStyle.Render("Window: ") + p.WindowName + "\n")
@@ -376,7 +432,7 @@ func (m model) renderStatusBar() string {
 		keys = []string{"j/k navigate", "space toggle", "ctrl+d submit", "esc cancel"}
 	case modalHelp:
 		keys = []string{"esc/? close"}
-	case modalDeleteConfirm:
+	case modalDeleteConfirm, modalCloseConfirm:
 		keys = []string{"y confirm", "n/esc cancel"}
 	case modalBrowser, modalWorktree, modalClaudeTask:
 		keys = []string{"esc dismiss"}
@@ -392,12 +448,15 @@ func (m model) renderStatusBar() string {
 			"tab switch panel",
 			"f filter state",
 			"g refresh",
-			"o open in browser",
+			"enter jump/open",
+			"o browser",
 			"c comment",
 			"w/W worktree/split",
 			"s/S claude/split",
 			permLabel,
+			"t theme:" + activeScheme.Name,
 			"l labels",
+			"x close/reopen",
 			"d delete",
 			"n new issue",
 			"? help",
@@ -407,12 +466,24 @@ func (m model) renderStatusBar() string {
 	if m.modal == modalNone && len(m.tmuxPanes) > 0 {
 		keys = append([]string{fmt.Sprintf("%d tmux ⟳", len(m.tmuxPanes))}, keys...)
 	}
-	parts := make([]string, len(keys))
+	// Build bar, truncating keys that don't fit the terminal width
+	var bar string
+	barW := 0
 	for i, k := range keys {
-		parts[i] = keybindStyle.Render(k)
+		part := keybindStyle.Render(k)
+		partW := lipgloss.Width(part)
+		sep := ""
+		sepW := 0
+		if i > 0 {
+			sep = " "
+			sepW = 1
+		}
+		if barW+sepW+partW > m.width {
+			break
+		}
+		bar += sep + part
+		barW += sepW + partW
 	}
-	bar := strings.Join(parts, " ")
-	barW := lipgloss.Width(bar)
 	if barW < m.width {
 		bar += strings.Repeat(" ", m.width-barW)
 	}

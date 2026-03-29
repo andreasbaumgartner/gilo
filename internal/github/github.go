@@ -101,6 +101,16 @@ func CreateIssue(title, body string) error {
 	return exec.Command("gh", args...).Run()
 }
 
+func CloseIssue(issueNum int) error {
+	return exec.Command("gh", "issue", "close",
+		fmt.Sprintf("%d", issueNum)).Run()
+}
+
+func ReopenIssue(issueNum int) error {
+	return exec.Command("gh", "issue", "reopen",
+		fmt.Sprintf("%d", issueNum)).Run()
+}
+
 func DeleteIssue(issueNum int) error {
 	return exec.Command("gh", "issue", "delete",
 		fmt.Sprintf("%d", issueNum), "--yes").Run()

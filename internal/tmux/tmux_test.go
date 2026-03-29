@@ -38,6 +38,41 @@ func TestIsClaudeIdle(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "claude asking a question (yes/no prompt)",
+			output: "some output\n" +
+				"  Do you want to allow this action?\n" +
+				"╭──────────────────────────────────────────────────────╮\n" +
+				"│ Yes  No                                              │\n" +
+				"╰──────────────────────────────────────────────────────╯\n",
+			want: true,
+		},
+		{
+			name: "claude edit confirmation prompt (numbered list)",
+			output: "  Edit file\n" +
+				"  README.md\n" +
+				"\n" +
+				"  Do you want to make this edit to README.md?\n" +
+				"❯ 1. Yes\n" +
+				"  2. Yes, allow all edits during this session (shift+tab)\n" +
+				"  3. No\n" +
+				"\n" +
+				"  Esc to cancel · Tab to amend\n",
+			want: true,
+		},
+		{
+			name: "claude bash command confirmation prompt",
+			output: "  Run command\n" +
+				"  npm install\n" +
+				"\n" +
+				"  Do you want to run this command?\n" +
+				"❯ 1. Yes\n" +
+				"  2. Yes, allow all commands during this session\n" +
+				"  3. No\n" +
+				"\n" +
+				"  Esc to cancel · Tab to amend\n",
+			want: true,
+		},
+		{
 			name:   "shell prompt not matching",
 			output: "user@host:~$ \n",
 			want:   false,
@@ -195,8 +230,11 @@ func TestPaneStatusConstants(t *testing.T) {
 	if StatusWorking != 0 {
 		t.Errorf("StatusWorking = %d, want 0", StatusWorking)
 	}
-	if StatusReview != 1 {
-		t.Errorf("StatusReview = %d, want 1", StatusReview)
+	if StatusQuestion != 1 {
+		t.Errorf("StatusQuestion = %d, want 1", StatusQuestion)
+	}
+	if StatusReview != 2 {
+		t.Errorf("StatusReview = %d, want 2", StatusReview)
 	}
 }
 

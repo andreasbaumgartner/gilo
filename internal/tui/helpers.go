@@ -34,7 +34,31 @@ func padRight(s string, w int) string {
 
 // Layout helpers
 
-func (m model) listW() int      { return m.width * 38 / 100 }
+const (
+	listMinW = 40
+	listMaxW = 80
+)
+
+func (m model) listW() int {
+	if m.width <= 0 {
+		return 0
+	}
+	w := m.width * 38 / 100
+	if w < listMinW && m.width >= listMinW+20 {
+		w = listMinW
+	}
+	if w > listMaxW {
+		w = listMaxW
+	}
+	if w > m.width-20 {
+		w = m.width - 20
+	}
+	if w < 0 {
+		return 0
+	}
+	return w
+}
+
 func (m model) detailW() int    { return m.width - m.listW() }
 func (m model) mainH() int      { return m.height - 2 }
 func (m model) listInnerW() int { return m.listW() - 4 }

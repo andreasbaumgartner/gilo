@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"fmt"
+	"os/exec"
+
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,6 +22,8 @@ type browserOpenedMsg struct{ err error }
 type commentPostedMsg struct{ err error }
 type issueCreatedMsg struct{ err error }
 type issueDeletedMsg struct{ err error }
+type issueClosedMsg struct{ err error }
+type issueReopenedMsg struct{ err error }
 type labelsLoadedMsg struct {
 	repoLabels  []github.RepoLabel
 	issueLabels map[string]bool
@@ -29,6 +34,10 @@ type worktreeCreatedMsg struct {
 }
 type claudeTaskCreatedMsg struct {
 	tmux.ClaudeResult
+}
+type tmuxJumpMsg struct {
+	windowName string
+	ok         bool
 }
 type tmuxStatusMsg []tmux.Pane
 type tmuxTickMsg struct{}
@@ -56,6 +65,7 @@ const (
 	modalLabel
 	modalClaudeTask
 	modalDeleteConfirm
+	modalCloseConfirm
 	modalPermissionWarning
 	modalHelp
 )
@@ -74,9 +84,10 @@ type model struct {
 
 	viewport viewport.Model
 
-	modal       modalKind
-	modalIssue  int
-	modalStatus string
+	modal            modalKind
+	modalIssue       int
+	modalStatus      string
+	modalCloseAction string // "close" or "reopen"
 	textarea    textarea.Model
 
 	textareaBody textarea.Model
@@ -91,6 +102,8 @@ type model struct {
 
 	refreshing bool
 
+	listOffset int
+
 	stateFilter string
 
 	settings settings.Settings
@@ -99,13 +112,17 @@ type model struct {
 func initialModel() model {
 	w, h, _ := term.GetSize(0)
 	vp := viewport.New(0, 0)
+	s := settings.Load()
+	if cs, ok := colorSchemes[s.ColorScheme]; ok {
+		applyColorScheme(cs)
+	}
 	return model{
 		width:       w,
 		height:      h,
 		viewport:    vp,
 		modal:       modalNone,
 		stateFilter: "OPEN",
-		settings:    settings.Load(),
+		settings:    s,
 	}
 }
 
@@ -128,6 +145,10 @@ func (m model) Init() tea.Cmd {
 
 // Run starts the TUI application.
 func Run() error {
+	if err := exec.Command("git", "rev-parse", "--show-toplevel").Run(); err != nil {
+		return fmt.Errorf("not a git repository. Please run gilo from inside a git repo")
+	}
+
 	p := tea.NewProgram(
 		initialModel(),
 		tea.WithAltScreen(),
