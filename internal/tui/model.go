@@ -18,6 +18,7 @@ type errMsg struct{ err error }
 type browserOpenedMsg struct{ err error }
 type commentPostedMsg struct{ err error }
 type issueCreatedMsg struct{ err error }
+type issueDeletedMsg struct{ err error }
 type labelsLoadedMsg struct {
 	repoLabels  []github.RepoLabel
 	issueLabels map[string]bool
@@ -54,6 +55,7 @@ const (
 	modalCreate
 	modalLabel
 	modalClaudeTask
+	modalDeleteConfirm
 	modalPermissionWarning
 	modalHelp
 )

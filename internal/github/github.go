@@ -101,6 +101,11 @@ func CreateIssue(title, body string) error {
 	return exec.Command("gh", args...).Run()
 }
 
+func DeleteIssue(issueNum int) error {
+	return exec.Command("gh", "issue", "delete",
+		fmt.Sprintf("%d", issueNum), "--yes").Run()
+}
+
 func OpenInBrowser(issueNum int) error {
 	return exec.Command("gh", "issue", "view",
 		fmt.Sprintf("%d", issueNum), "--web").Run()

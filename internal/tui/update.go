@@ -73,6 +73,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, fetchIssuesCmd
 		}
 
+	case issueDeletedMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Error: %v", msg.err)
+		} else {
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, fetchIssuesCmd
+		}
+
 	case labelsLoadedMsg:
 		m.repoLabels = msg.repoLabels
 		m.labelSelected = make(map[string]bool)
@@ -173,6 +182,18 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			settings.Save(m.settings)
 			m.modal = modalNone
 			m.modalStatus = ""
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
+	case modalDeleteConfirm:
+		switch msg.String() {
+		case "y", "Y":
+			m.modalStatus = "Deleting issue..."
+			num := m.modalIssue
+			return m, deleteIssueCmd(num)
 		case "n", "N", "esc":
 			m.modal = modalNone
 			m.modalStatus = ""
@@ -404,6 +425,15 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.labelCursor = 0
 			return m, fetchLabelsCmd(issue)
 		}
+
+	case "d":
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
+			m.modal = modalDeleteConfirm
+			m.modalIssue = filtered[m.cursor].Number
+			m.modalStatus = ""
+		}
+		return m, nil
 
 	case "?":
 		m.modal = modalHelp
