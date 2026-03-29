@@ -50,6 +50,12 @@ var (
 			Bold(true).
 			Padding(0, 1)
 
+	reviewBadge = lipgloss.NewStyle().
+			Background(lipgloss.Color("23")).
+			Foreground(lipgloss.Color("14")).
+			Bold(true).
+			Padding(0, 1)
+
 	keybindStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("236")).
 			Foreground(lipgloss.Color("252")).
