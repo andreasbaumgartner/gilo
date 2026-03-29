@@ -215,10 +215,12 @@ func (m model) renderList() string {
 				stateBadge = closedBadge.Render("CLOSED")
 			}
 
-			tmuxIndicator := ""
+			statusBadge := ""
+			statusWidth := 0
 			for _, p := range m.tmuxPanes {
 				if p.IssueNum == issue.Number {
-					tmuxIndicator = yellowStyle.Render(" ⟳")
+					statusBadge = " " + workingBadge.Render("WORKING")
+					statusWidth = 10
 					break
 				}
 			}
@@ -229,13 +231,13 @@ func (m model) renderList() string {
 			}
 
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-20)
-			line := stateBadge + pad + " " + num + " " + title + tmuxIndicator
+			title := truncate(issue.Title, innerW-20-statusWidth)
+			line := stateBadge + pad + statusBadge + " " + num + " " + title
 
 			if i == m.cursor {
 				if active {
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-20))
-					line = stateBadge + pad + " " + selectedStyle.Render(padRight(rest, innerW-12)) + tmuxIndicator
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-20-statusWidth))
+					line = stateBadge + pad + statusBadge + " " + selectedStyle.Render(padRight(rest, innerW-12-statusWidth))
 				} else {
 					line = lipgloss.NewStyle().
 						Foreground(lipgloss.Color("252")).
