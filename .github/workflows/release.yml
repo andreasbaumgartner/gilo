@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  version-and-tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current version
+        id: current_version
+        run: |
+          # Get the latest version tag, default to v0.0.0 if none exists
+          LATEST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -n 1)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v0.0.0"
+          fi
+          echo "tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Current version: $LATEST_TAG"
+
+      - name: Determine next version
+        id: next_version
+        run: |
+          CURRENT="${{ steps.current_version.outputs.tag }}"
+          # Strip 'v' prefix
+          VERSION="${CURRENT#v}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION"
+
+          # Check commit messages since last tag for version bump hints
+          if [ "$CURRENT" = "v0.0.0" ]; then
+            NEXT="v0.0.1"
+          else
+            COMMITS=$(git log "${CURRENT}..HEAD" --pretty=format:"%s" 2>/dev/null || echo "")
+            if echo "$COMMITS" | grep -qiE "^(breaking|major):"; then
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+            elif echo "$COMMITS" | grep -qiE "^feat"; then
+              MINOR=$((MINOR + 1))
+              PATCH=0
+            else
+              PATCH=$((PATCH + 1))
+            fi
+            NEXT="v${MAJOR}.${MINOR}.${PATCH}"
+          fi
+
+          echo "version=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "Next version: $NEXT"
+
+      - name: Create tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.next_version.outputs.version }}" -m "Release ${{ steps.next_version.outputs.version }}"
+          git push origin "${{ steps.next_version.outputs.version }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.next_version.outputs.version }}
+          generate_release_notes: true
