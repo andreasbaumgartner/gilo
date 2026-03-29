@@ -331,7 +331,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modal = modalClaudeTask
 			m.modalIssue = issue.Number
 			m.modalStatus = ""
-			return m, createClaudeTaskCmd(issue, msg.String() == "S", m.settings.DangerouslySkipPermissions, m.settings.AllowRoot)
+			return m, createClaudeTaskCmd(issue, msg.String() == "S", m.settings.DangerouslySkipPermissions)
 		}
 
 	case "p":
@@ -345,11 +345,6 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modal = modalPermissionWarning
 			m.modalStatus = ""
 		}
-		return m, nil
-
-	case "r":
-		m.settings.AllowRoot = !m.settings.AllowRoot
-		settings.Save(m.settings)
 		return m, nil
 
 	case "c":

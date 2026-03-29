@@ -29,7 +29,9 @@
       "Bash(git config:*)",
       "Bash(curl:*)",
       "Bash(chmod:*)",
-      "Bash(find /workspaces/gilo -type f \\\\\\(-name *.md -o -name *.json -o -name go.mod -o -name *.yaml -o -name *.yml \\\\\\))"
+      "Bash(find /workspaces/gilo -type f \\\\\\(-name *.md -o -name *.json -o -name go.mod -o -name *.yaml -o -name *.yml \\\\\\))",
+      "Bash(wc:*)",
+      "Bash(node:*)"
     ]
   }
 }

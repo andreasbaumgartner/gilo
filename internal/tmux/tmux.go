@@ -151,18 +151,15 @@ func OpenWorktree(branch, worktreePath string, existed, split bool) WorktreeResu
 	return WorktreeResult{Branch: branch, Path: worktreePath, Session: sessionName, Existed: existed}
 }
 
-func BuildClaudeCommand(prompt string, dangerouslySkipPermissions, allowRoot bool) string {
+func BuildClaudeCommand(prompt string, dangerouslySkipPermissions bool) string {
 	cmd := "claude"
 	if dangerouslySkipPermissions {
-		cmd += " --dangerously-skip-permissions"
-	}
-	if allowRoot {
-		cmd += " --allow-root"
+		cmd = "IS_SANDBOX=1 claude --dangerously-skip-permissions"
 	}
 	return fmt.Sprintf("%s %q", cmd, prompt)
 }
 
-func OpenClaude(branch, worktreePath string, existed bool, prompt string, split, skipPermissions, allowRoot bool) ClaudeResult {
+func OpenClaude(branch, worktreePath string, existed bool, prompt string, split, skipPermissions bool) ClaudeResult {
 	if os.Getenv("TMUX") == "" {
 		if _, err := exec.LookPath("tmux"); err != nil {
 			return ClaudeResult{
@@ -179,7 +176,7 @@ func OpenClaude(branch, worktreePath string, existed bool, prompt string, split,
 				Branch: branch, Path: worktreePath, Existed: existed,
 			}
 		}
-		cmd := BuildClaudeCommand(prompt, skipPermissions, allowRoot)
+		cmd := BuildClaudeCommand(prompt, skipPermissions)
 		exec.Command("tmux", "send-keys", "-t", branch, cmd, "Enter").Run()
 		return ClaudeResult{Branch: branch, Path: worktreePath, Existed: existed}
 	}
@@ -196,7 +193,7 @@ func OpenClaude(branch, worktreePath string, existed bool, prompt string, split,
 				Branch: branch, Path: worktreePath, Existed: existed,
 			}
 		}
-		cmd := BuildClaudeCommand(prompt, skipPermissions, allowRoot)
+		cmd := BuildClaudeCommand(prompt, skipPermissions)
 		exec.Command("tmux", "send-keys", "-t", ":.+", cmd, "Enter").Run()
 		return ClaudeResult{Branch: branch, Path: worktreePath, Existed: existed, Split: true}
 	}
@@ -207,7 +204,7 @@ func OpenClaude(branch, worktreePath string, existed bool, prompt string, split,
 			Branch: branch, Path: worktreePath, Existed: existed,
 		}
 	}
-	cmd := BuildClaudeCommand(prompt, skipPermissions, allowRoot)
+	cmd := BuildClaudeCommand(prompt, skipPermissions)
 	exec.Command("tmux", "send-keys", "-t", branch, cmd, "Enter").Run()
 	return ClaudeResult{Branch: branch, Path: worktreePath, Existed: existed}
 }

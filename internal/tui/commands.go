@@ -60,14 +60,14 @@ func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	}
 }
 
-func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions, allowRoot bool) tea.Cmd {
+func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
 		if err != nil {
 			return claudeTaskCreatedMsg{tmux.ClaudeResult{Err: err, Branch: branch}}
 		}
 		prompt := buildClaudePrompt(issue)
-		return claudeTaskCreatedMsg{tmux.OpenClaude(branch, path, existed, prompt, split, dangerouslySkipPermissions, allowRoot)}
+		return claudeTaskCreatedMsg{tmux.OpenClaude(branch, path, existed, prompt, split, dangerouslySkipPermissions)}
 	}
 }
 

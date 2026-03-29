@@ -69,9 +69,6 @@ func (m model) renderModal() string {
 		if m.settings.DangerouslySkipPermissions {
 			content += "\n\n" + lipgloss.NewStyle().Foreground(colorYellow).Render("⚡ Running with --dangerously-skip-permissions")
 		}
-		if m.settings.AllowRoot {
-			content += "\n" + lipgloss.NewStyle().Foreground(colorYellow).Render("⚡ Running with --allow-root")
-		}
 		return modalStyle.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
 
 	case modalPermissionWarning:
@@ -321,10 +318,6 @@ func (m model) renderStatusBar() string {
 		if m.settings.DangerouslySkipPermissions {
 			permLabel = "p permissions:ON"
 		}
-		rootLabel := "r allow-root:off"
-		if m.settings.AllowRoot {
-			rootLabel = "r allow-root:ON"
-		}
 		keys = []string{
 			"↑↓/jk navigate",
 			"tab switch panel",
@@ -334,7 +327,6 @@ func (m model) renderStatusBar() string {
 			"w/W worktree/split",
 			"s/S claude/split",
 			permLabel,
-			rootLabel,
 			"l labels",
 			"n new issue",
 			"q quit",
