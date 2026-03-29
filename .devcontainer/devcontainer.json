@@ -8,7 +8,7 @@
     "ghcr.io/devcontainers/features/node:1": {},
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
-  "postCreateCommand": "cd ~/.dotfiles && bash setup.sh || true",
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code && (cd ~/.dotfiles && bash setup.sh || true)",
   "settings": {
     "terminal.integrated.defaultProfile.linux": "zsh",
     "terminal.integrated.profiles.linux": {
