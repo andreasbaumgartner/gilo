@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/andreasbaumgartner/gilo/internal/tmux"
 )
 
 func (m model) View() string {
@@ -231,8 +233,13 @@ func (m model) renderList() string {
 			statusWidth := 0
 			for _, p := range m.tmuxPanes {
 				if p.IssueNum == issue.Number {
-					statusBadge = " " + workingBadge.Render("WORKING")
-					statusWidth = 10
+					if p.Status == tmux.StatusReview {
+						statusBadge = " " + reviewBadge.Render("REVIEW")
+						statusWidth = 10
+					} else {
+						statusBadge = " " + workingBadge.Render("WORKING")
+						statusWidth = 10
+					}
 					break
 				}
 			}
@@ -316,6 +323,11 @@ func (m model) renderDetailContent() string {
 		if p.IssueNum == issue.Number {
 			b.WriteString("\n")
 			b.WriteString(dimStyle.Render("── Tmux ") + dimStyle.Render(strings.Repeat("─", max(0, w-10))) + "\n\n")
+			statusLabel := workingBadge.Render("WORKING")
+			if p.Status == tmux.StatusReview {
+				statusLabel = reviewBadge.Render("REVIEW")
+			}
+			b.WriteString("  " + yellowStyle.Render("Status: ") + statusLabel + "\n")
 			b.WriteString("  " + yellowStyle.Render("Window: ") + p.WindowName + "\n")
 			if p.LastLine != "" {
 				b.WriteString("  " + yellowStyle.Render("Output: ") + truncate(p.LastLine, w-12) + "\n")

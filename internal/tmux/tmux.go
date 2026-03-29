@@ -11,10 +11,19 @@ import (
 
 var issueWindowRe = regexp.MustCompile(`^issue-(\d+)-`)
 
+// PaneStatus represents the state of a Claude session in a tmux pane.
+type PaneStatus int
+
+const (
+	StatusWorking PaneStatus = iota
+	StatusReview
+)
+
 type Pane struct {
 	WindowName string
 	IssueNum   int
 	LastLine   string
+	Status     PaneStatus
 }
 
 type WorktreeResult struct {
@@ -74,13 +83,42 @@ func FetchStatus() []Pane {
 			}
 		}
 
+		status := StatusWorking
+		// Check if claude is still running in the pane by inspecting the
+		// current command of the pane. If it is a shell (bash, zsh, etc.),
+		// Claude has finished and the issue is ready for review.
+		cmdOut, cmdErr := exec.Command("tmux", "list-panes", "-t", name, "-F", "#{pane_current_command}").Output()
+		if cmdErr == nil {
+			cmd := strings.TrimSpace(string(cmdOut))
+			if !isClaudeProcess(cmd) {
+				status = StatusReview
+			}
+		}
+
 		panes = append(panes, Pane{
 			WindowName: name,
 			IssueNum:   issueNum,
 			LastLine:   lastLine,
+			Status:     status,
 		})
 	}
 	return panes
+}
+
+// isClaudeProcess returns true if the command looks like an active Claude process
+// rather than a shell prompt (which would indicate Claude has finished).
+func isClaudeProcess(cmd string) bool {
+	// When Claude is running, the pane command is typically "claude" or "node"
+	// (since Claude Code is a Node.js app). When it finishes, the pane falls
+	// back to the user's shell (bash, zsh, fish, etc.).
+	cmd = strings.ToLower(strings.TrimSpace(cmd))
+	shells := []string{"bash", "zsh", "fish", "sh", "dash", "ksh", "tcsh", "csh"}
+	for _, s := range shells {
+		if cmd == s {
+			return false
+		}
+	}
+	return true
 }
 
 func WindowExists(branch string) bool {
