@@ -233,9 +233,12 @@ func (m model) renderList() string {
 			statusBadge := ""
 			for _, p := range m.tmuxPanes {
 				if p.IssueNum == issue.Number {
-					if p.Status == tmux.StatusReview {
+					switch p.Status {
+					case tmux.StatusReview:
 						statusBadge = reviewBadge.Render("REVIEW")
-					} else {
+					case tmux.StatusQuestion:
+						statusBadge = questionBadge.Render("QUESTION")
+					default:
 						statusBadge = workingBadge.Render("WORKING")
 					}
 					break
@@ -325,9 +328,14 @@ func (m model) renderDetailContent() string {
 		if p.IssueNum == issue.Number {
 			b.WriteString("\n")
 			b.WriteString(dimStyle.Render("── Tmux ") + dimStyle.Render(strings.Repeat("─", max(0, w-10))) + "\n\n")
-			statusLabel := workingBadge.Render("WORKING")
-			if p.Status == tmux.StatusReview {
+			var statusLabel string
+			switch p.Status {
+			case tmux.StatusReview:
 				statusLabel = reviewBadge.Render("REVIEW")
+			case tmux.StatusQuestion:
+				statusLabel = questionBadge.Render("QUESTION")
+			default:
+				statusLabel = workingBadge.Render("WORKING")
 			}
 			b.WriteString("  " + yellowStyle.Render("Status: ") + statusLabel + "\n")
 			b.WriteString("  " + yellowStyle.Render("Window: ") + p.WindowName + "\n")
