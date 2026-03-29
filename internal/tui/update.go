@@ -41,6 +41,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.cursor >= len(filtered) {
 			m.cursor = max(0, len(filtered)-1)
 		}
+		m.clampListOffset()
 		m.updateViewport()
 
 	case errMsg:
@@ -354,6 +355,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			filtered := m.filteredIssues()
 			if m.cursor < len(filtered)-1 {
 				m.cursor++
+				m.clampListOffset()
 				m.updateViewport()
 			}
 		} else {
@@ -364,6 +366,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.focus == focusList {
 			if m.cursor > 0 {
 				m.cursor--
+				m.clampListOffset()
 				m.updateViewport()
 			}
 		} else {
@@ -508,6 +511,8 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor >= len(filtered) {
 			m.cursor = max(0, len(filtered)-1)
 		}
+		m.listOffset = 0
+		m.clampListOffset()
 		m.updateViewport()
 
 	case "t":
@@ -529,6 +534,37 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *model) clampListOffset() {
+	innerH := m.mainH() - 2
+	// 2 rows for header + blank line
+	visibleRows := innerH - 2
+
+	// Account for scroll indicator rows
+	if m.listOffset > 0 {
+		visibleRows-- // up indicator
+	}
+	filtered := m.filteredIssues()
+	if m.listOffset+visibleRows < len(filtered) {
+		visibleRows-- // down indicator
+	}
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+
+	// Scroll down if cursor is below visible area
+	if m.cursor >= m.listOffset+visibleRows {
+		m.listOffset = m.cursor - visibleRows + 1
+	}
+	// Scroll up if cursor is above visible area
+	if m.cursor < m.listOffset {
+		m.listOffset = m.cursor
+	}
+	// Clamp offset
+	if m.listOffset < 0 {
+		m.listOffset = 0
+	}
 }
 
 func (m *model) updateViewport() {

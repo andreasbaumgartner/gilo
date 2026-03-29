@@ -98,6 +98,8 @@ type model struct {
 
 	refreshing bool
 
+	listOffset int
+
 	stateFilter string
 
 	settings settings.Settings
