@@ -6,6 +6,17 @@ A Terminal User Interface (TUI) for managing GitHub issues and AI agents, writte
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey)
 
+## Screenshots
+
+### Create New Issue
+![Create New Issue](assets/create-issue.png)
+
+### Issues List
+![Issues List](assets/issues-list.png)
+
+### Issue Detail View
+![Issue Detail View](assets/issue-detail.png)
+
 ## Features
 
 ### Issue Management
