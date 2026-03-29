@@ -72,9 +72,11 @@ func FetchStatus() []Pane {
 		issueNum, _ := strconv.Atoi(m[1])
 
 		var lastLine string
+		var capturedOutput string
 		out, err := exec.Command("tmux", "capture-pane", "-t", name, "-p").Output()
 		if err == nil {
-			lines := strings.Split(string(out), "\n")
+			capturedOutput = string(out)
+			lines := strings.Split(capturedOutput, "\n")
 			for i := len(lines) - 1; i >= 0; i-- {
 				if l := strings.TrimSpace(lines[i]); l != "" {
 					lastLine = l
@@ -92,6 +94,11 @@ func FetchStatus() []Pane {
 			cmd := strings.TrimSpace(string(cmdOut))
 			if !isClaudeProcess(cmd) {
 				status = StatusReview
+			} else if isClaudeIdle(capturedOutput) {
+				// Claude Code stays in interactive mode after finishing
+				// work. Detect the idle input prompt to determine that
+				// the agent is done and the issue is ready for review.
+				status = StatusReview
 			}
 		}
 
@@ -103,6 +110,47 @@ func FetchStatus() []Pane {
 		})
 	}
 	return panes
+}
+
+// isClaudeIdle checks if the captured pane content indicates that Claude Code
+// has finished processing and is waiting for user input. When idle, Claude
+// shows an input prompt box at the bottom of the terminal:
+//
+//	╭─────────────────────╮
+//	│ >                   │
+//	╰─────────────────────╯
+func isClaudeIdle(output string) bool {
+	if output == "" {
+		return false
+	}
+
+	lines := strings.Split(output, "\n")
+
+	// Collect last non-empty lines from the bottom of the pane.
+	var lastLines []string
+	for i := len(lines) - 1; i >= 0 && len(lastLines) < 5; i-- {
+		if l := strings.TrimSpace(lines[i]); l != "" {
+			lastLines = append(lastLines, l)
+		}
+	}
+
+	if len(lastLines) < 2 {
+		return false
+	}
+
+	// The last non-empty line should be the bottom border of the input box.
+	if !strings.HasPrefix(lastLines[0], "╰") || !strings.HasSuffix(lastLines[0], "╯") {
+		return false
+	}
+
+	// One of the lines above should be the prompt line containing │ and >.
+	for _, line := range lastLines[1:] {
+		if strings.Contains(line, "│") && strings.Contains(line, ">") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // isClaudeProcess returns true if the command looks like an active Claude process
