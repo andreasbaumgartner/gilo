@@ -49,9 +49,9 @@ Check if running inside tmux by checking the `TMUX` environment variable.
 
 If inside tmux, run this as a single command:
 ```
-cd {MAIN_REPO} && git worktree remove {WORKTREE_PATH} --force && tmux kill-window
+cd {MAIN_REPO} && git worktree remove {WORKTREE_PATH} --force && tmux kill-pane
 ```
-The `tmux kill-window` closes the current window and returns the user to the gilo TUI window. Note: this will terminate the current Claude session — that is expected and intentional.
+The `tmux kill-pane` closes the current pane and returns the user to the gilo TUI. Using `kill-pane` instead of `kill-window` ensures that only the Claude pane is closed — if gilo is in a split pane of the same window, it stays open. If this is the only pane in the window, the window closes automatically. Note: this will terminate the current Claude session — that is expected and intentional.
 
 If not inside tmux, run:
 ```
