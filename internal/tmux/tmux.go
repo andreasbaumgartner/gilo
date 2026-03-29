@@ -143,9 +143,12 @@ func isClaudeIdle(output string) bool {
 		return false
 	}
 
-	// One of the lines above should be the prompt line containing │ and >.
+	// One of the lines above should be a line inside the input box (bordered
+	// by │ on both sides). We do NOT require ">" because Claude's permission
+	// and question prompts use the same box but show "Yes / No" or other
+	// content instead of a ">" caret.
 	for _, line := range lastLines[1:] {
-		if strings.Contains(line, "│") && strings.Contains(line, ">") {
+		if strings.HasPrefix(line, "│") && strings.HasSuffix(line, "│") {
 			return true
 		}
 	}
