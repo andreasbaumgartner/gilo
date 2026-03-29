@@ -54,6 +54,7 @@ const (
 	modalLabel
 	modalClaudeTask
 	modalPermissionWarning
+	modalHelp
 )
 
 // Model
