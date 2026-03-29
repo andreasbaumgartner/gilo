@@ -138,6 +138,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.modal {
+	case modalHelp:
+		if msg.String() == "esc" || msg.String() == "?" {
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
 	case modalBrowser:
 		if msg.String() == "esc" {
 			m.modal = modalNone
@@ -391,6 +398,11 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.labelCursor = 0
 			return m, fetchLabelsCmd(issue)
 		}
+
+	case "?":
+		m.modal = modalHelp
+		m.modalStatus = ""
+		return m, nil
 
 	case "f":
 		switch m.stateFilter {

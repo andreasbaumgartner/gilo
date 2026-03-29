@@ -135,6 +135,39 @@ func (m model) renderModal() string {
 			body = strings.Join(rows, "\n")
 		}
 		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+	case modalHelp:
+		title := titleStyle.Render("Keybindings")
+		sections := []string{
+			title, "",
+			dimStyle.Render("── Navigation ──"),
+			"  ↑/k       Move up",
+			"  ↓/j       Move down",
+			"  tab       Switch panel",
+			"  f         Cycle filter (Open/Closed/All)",
+			"",
+			dimStyle.Render("── Actions ──"),
+			"  o/enter   Open issue in browser",
+			"  c         Comment on issue",
+			"  n         Create new issue",
+			"  l         Manage labels",
+			"",
+			dimStyle.Render("── Worktree & Claude ──"),
+			"  w         Worktree in new tmux window",
+			"  W         Worktree in tmux split",
+			"  s         Claude session in new window",
+			"  S         Claude session in split",
+			"",
+			dimStyle.Render("── Settings ──"),
+			"  p         Toggle skip-permissions",
+			"  r         Toggle allow-root",
+			"",
+			dimStyle.Render("── General ──"),
+			"  ?         Show this help",
+			"  q         Quit",
+			"",
+			dimStyle.Render("esc/?  close"),
+		}
+		return modalStyle.Width(46).Render(strings.Join(sections, "\n"))
 	}
 	return ""
 }
@@ -309,6 +342,8 @@ func (m model) renderStatusBar() string {
 		keys = []string{"tab switch field", "ctrl+d submit", "esc cancel"}
 	case modalLabel:
 		keys = []string{"j/k navigate", "space toggle", "ctrl+d submit", "esc cancel"}
+	case modalHelp:
+		keys = []string{"esc/? close"}
 	case modalBrowser, modalWorktree, modalClaudeTask:
 		keys = []string{"esc dismiss"}
 	case modalPermissionWarning:
@@ -329,6 +364,7 @@ func (m model) renderStatusBar() string {
 			permLabel,
 			"l labels",
 			"n new issue",
+			"? help",
 			"q quit",
 		}
 	}
