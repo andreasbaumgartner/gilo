@@ -22,6 +22,8 @@ type browserOpenedMsg struct{ err error }
 type commentPostedMsg struct{ err error }
 type issueCreatedMsg struct{ err error }
 type issueDeletedMsg struct{ err error }
+type issueClosedMsg struct{ err error }
+type issueReopenedMsg struct{ err error }
 type labelsLoadedMsg struct {
 	repoLabels  []github.RepoLabel
 	issueLabels map[string]bool
@@ -59,6 +61,7 @@ const (
 	modalLabel
 	modalClaudeTask
 	modalDeleteConfirm
+	modalCloseConfirm
 	modalPermissionWarning
 	modalHelp
 )
@@ -77,9 +80,10 @@ type model struct {
 
 	viewport viewport.Model
 
-	modal       modalKind
-	modalIssue  int
-	modalStatus string
+	modal            modalKind
+	modalIssue       int
+	modalStatus      string
+	modalCloseAction string // "close" or "reopen"
 	textarea    textarea.Model
 
 	textareaBody textarea.Model

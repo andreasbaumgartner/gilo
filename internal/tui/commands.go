@@ -56,6 +56,18 @@ func applyLabelChangesCmd(issueNum int, toAdd, toRemove []string) tea.Cmd {
 	}
 }
 
+func closeIssueCmd(issueNum int) tea.Cmd {
+	return func() tea.Msg {
+		return issueClosedMsg{github.CloseIssue(issueNum)}
+	}
+}
+
+func reopenIssueCmd(issueNum int) tea.Cmd {
+	return func() tea.Msg {
+		return issueReopenedMsg{github.ReopenIssue(issueNum)}
+	}
+}
+
 func deleteIssueCmd(issueNum int) tea.Cmd {
 	return func() tea.Msg {
 		return issueDeletedMsg{github.DeleteIssue(issueNum)}

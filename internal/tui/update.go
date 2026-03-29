@@ -82,6 +82,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, fetchIssuesCmd
 		}
 
+	case issueClosedMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Error: %v", msg.err)
+		} else {
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, fetchIssuesCmd
+		}
+
+	case issueReopenedMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Error: %v", msg.err)
+		} else {
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, fetchIssuesCmd
+		}
+
 	case labelsLoadedMsg:
 		m.repoLabels = msg.repoLabels
 		m.labelSelected = make(map[string]bool)
@@ -194,6 +212,22 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modalStatus = "Deleting issue..."
 			num := m.modalIssue
 			return m, deleteIssueCmd(num)
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
+	case modalCloseConfirm:
+		switch msg.String() {
+		case "y", "Y":
+			num := m.modalIssue
+			if m.modalCloseAction == "close" {
+				m.modalStatus = "Closing issue..."
+				return m, closeIssueCmd(num)
+			}
+			m.modalStatus = "Reopening issue..."
+			return m, reopenIssueCmd(num)
 		case "n", "N", "esc":
 			m.modal = modalNone
 			m.modalStatus = ""
@@ -425,6 +459,21 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.labelCursor = 0
 			return m, fetchLabelsCmd(issue)
 		}
+
+	case "x":
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
+			issue := filtered[m.cursor]
+			m.modal = modalCloseConfirm
+			m.modalIssue = issue.Number
+			m.modalStatus = ""
+			if issue.State == "OPEN" {
+				m.modalCloseAction = "close"
+			} else {
+				m.modalCloseAction = "reopen"
+			}
+		}
+		return m, nil
 
 	case "d":
 		filtered := m.filteredIssues()
