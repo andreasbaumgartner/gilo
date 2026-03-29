@@ -6,6 +6,8 @@ A Terminal User Interface (TUI) for managing GitHub issues and AI agents, writte
 ![License](https://img.shields.io/badge/License-MIT-blue)
 ![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-lightgrey)
 
+> **Disclaimer:** This software is under active development and is provided as-is with no warranty. Features may be incomplete, unstable, or subject to breaking changes. Use at your own risk.
+
 ## Screenshots
 
 ### Status Claude Code in List
