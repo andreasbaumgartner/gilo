@@ -41,6 +41,22 @@ A Terminal User Interface (TUI) for managing GitHub issues and AI agents, writte
 
 ## Installation
 
+### Install with `go install`
+
+The easiest way to install gilo on Linux (or any platform with Go):
+
+```bash
+go install github.com/andreasbaumgartner/gilo/cmd/gilo@latest
+```
+
+This downloads, compiles, and installs the `gilo` binary to your `$GOPATH/bin` (or `$GOBIN`). Make sure this directory is in your `PATH`:
+
+```bash
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
+
+You can add the line above to your `~/.bashrc` or `~/.zshrc` to make it permanent.
+
 ### Build from source
 
 ```bash
@@ -49,18 +65,18 @@ cd gilo
 go build -o gilo ./cmd/gilo/
 ```
 
+Optionally move the binary to a directory in your `PATH`:
+
+```bash
+sudo mv gilo /usr/local/bin/
+```
+
 ### Run
 
 Navigate to any Git repository with GitHub issues and run:
 
 ```bash
-./gilo
-```
-
-You can also move the binary to a directory in your `PATH` for global access:
-
-```bash
-go build -o gilo ./cmd/gilo/ && mv gilo /usr/local/bin/
+gilo
 ```
 
 ## Usage
