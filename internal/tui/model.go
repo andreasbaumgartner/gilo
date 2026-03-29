@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"fmt"
+	"os/exec"
+
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -128,6 +131,10 @@ func (m model) Init() tea.Cmd {
 
 // Run starts the TUI application.
 func Run() error {
+	if err := exec.Command("git", "rev-parse", "--show-toplevel").Run(); err != nil {
+		return fmt.Errorf("not a git repository. Please run gilo from inside a git repo")
+	}
+
 	p := tea.NewProgram(
 		initialModel(),
 		tea.WithAltScreen(),

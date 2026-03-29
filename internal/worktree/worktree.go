@@ -31,6 +31,16 @@ func Exists(path string) bool {
 	return gerr == nil && !gi.IsDir()
 }
 
+func checkWritable(dir string) error {
+	tmp, err := os.CreateTemp(dir, ".gilo-check-*")
+	if err != nil {
+		return err
+	}
+	tmp.Close()
+	os.Remove(tmp.Name())
+	return nil
+}
+
 func Ensure(issueNumber int, title string) (branch, worktreePath string, existed bool, err error) {
 	branch = fmt.Sprintf("issue-%d-%s", issueNumber, Slugify(title))
 
@@ -39,6 +49,15 @@ func Ensure(issueNumber int, title string) (branch, worktreePath string, existed
 		return branch, "", false, fmt.Errorf("not a git repo: %w", gitErr)
 	}
 	repoRoot := strings.TrimSpace(string(rootOut))
+
+	refsDir := filepath.Join(repoRoot, ".git", "refs", "heads")
+	if err := checkWritable(refsDir); err != nil {
+		gitDir := filepath.Join(repoRoot, ".git")
+		return branch, "", false, fmt.Errorf(
+			"permission denied: cannot write to %s\nFix with: sudo chown -R $(id -u):$(id -g) %s",
+			refsDir, gitDir)
+	}
+
 	worktreePath = filepath.Join(filepath.Dir(repoRoot), ".worktrees", branch)
 
 	existed = Exists(worktreePath)
