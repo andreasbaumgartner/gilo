@@ -460,6 +460,23 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.cursor = max(0, len(filtered)-1)
 		}
 		m.updateViewport()
+
+	case "t":
+		current := m.settings.ColorScheme
+		if current == "" {
+			current = "default"
+		}
+		next := colorSchemeOrder[0]
+		for i, name := range colorSchemeOrder {
+			if name == current {
+				next = colorSchemeOrder[(i+1)%len(colorSchemeOrder)]
+				break
+			}
+		}
+		applyColorScheme(colorSchemes[next])
+		m.settings.ColorScheme = next
+		settings.Save(m.settings)
+		m.updateViewport()
 	}
 
 	return m, nil

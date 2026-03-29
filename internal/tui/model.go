@@ -102,13 +102,17 @@ type model struct {
 func initialModel() model {
 	w, h, _ := term.GetSize(0)
 	vp := viewport.New(0, 0)
+	s := settings.Load()
+	if cs, ok := colorSchemes[s.ColorScheme]; ok {
+		applyColorScheme(cs)
+	}
 	return model{
 		width:       w,
 		height:      h,
 		viewport:    vp,
 		modal:       modalNone,
 		stateFilter: "OPEN",
-		settings:    settings.Load(),
+		settings:    s,
 	}
 }
 
