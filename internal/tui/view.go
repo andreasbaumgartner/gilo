@@ -82,6 +82,17 @@ func (m model) renderModal() string {
 		hint := dimStyle.Render("y confirm  │  n/esc cancel")
 		return modalStyle.Render(strings.Join([]string{title, "", warning, "", hint}, "\n"))
 
+	case modalDeleteConfirm:
+		title := titleStyle.Render(fmt.Sprintf("Delete Issue #%d", m.modalIssue))
+		var body string
+		if m.modalStatus != "" {
+			body = m.modalStatus
+		} else {
+			body = "Are you sure you want to delete this issue?\nThis action cannot be undone."
+		}
+		hint := dimStyle.Render("y confirm  │  n/esc cancel")
+		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
 	case modalComment:
 		title := titleStyle.Render(fmt.Sprintf("Comment on #%d", m.modalIssue))
 		hint := dimStyle.Render("ctrl+d submit  │  esc cancel")
@@ -149,6 +160,7 @@ func (m model) renderModal() string {
 			"  o/enter   Open issue in browser",
 			"  c         Comment on issue",
 			"  n         Create new issue",
+			"  d         Delete issue",
 			"  l         Manage labels",
 			"",
 			dimStyle.Render("── Worktree & Claude ──"),
@@ -349,6 +361,8 @@ func (m model) renderStatusBar() string {
 		keys = []string{"j/k navigate", "space toggle", "ctrl+d submit", "esc cancel"}
 	case modalHelp:
 		keys = []string{"esc/? close"}
+	case modalDeleteConfirm:
+		keys = []string{"y confirm", "n/esc cancel"}
 	case modalBrowser, modalWorktree, modalClaudeTask:
 		keys = []string{"esc dismiss"}
 	case modalPermissionWarning:
@@ -369,6 +383,7 @@ func (m model) renderStatusBar() string {
 			"s/S claude/split",
 			permLabel,
 			"l labels",
+			"d delete",
 			"n new issue",
 			"? help",
 			"q quit",

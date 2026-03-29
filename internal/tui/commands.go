@@ -56,6 +56,12 @@ func applyLabelChangesCmd(issueNum int, toAdd, toRemove []string) tea.Cmd {
 	}
 }
 
+func deleteIssueCmd(issueNum int) tea.Cmd {
+	return func() tea.Msg {
+		return issueDeletedMsg{github.DeleteIssue(issueNum)}
+	}
+}
+
 func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
