@@ -230,19 +230,20 @@ func (m model) renderList() string {
 			}
 
 			statusBadge := ""
-			statusWidth := 0
 			for _, p := range m.tmuxPanes {
 				if p.IssueNum == issue.Number {
 					if p.Status == tmux.StatusReview {
-						statusBadge = " " + reviewBadge.Render("REVIEW")
-						statusWidth = 10
+						statusBadge = reviewBadge.Render("REVIEW")
 					} else {
-						statusBadge = " " + workingBadge.Render("WORKING")
-						statusWidth = 10
+						statusBadge = workingBadge.Render("WORKING")
 					}
 					break
 				}
 			}
+
+			// Fixed-width columns for consistent alignment
+			const statusColWidth = 10
+			statusCol := padRight(" "+statusBadge, statusColWidth)
 
 			pad := ""
 			if issue.State != "CLOSED" {
@@ -250,13 +251,13 @@ func (m model) renderList() string {
 			}
 
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-20-statusWidth)
-			line := stateBadge + pad + statusBadge + " " + num + " " + title
+			title := truncate(issue.Title, innerW-20-statusColWidth)
+			line := stateBadge + pad + statusCol + " " + num + " " + title
 
 			if i == m.cursor {
 				if active {
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-20-statusWidth))
-					line = stateBadge + pad + statusBadge + " " + selectedStyle.Render(padRight(rest, innerW-12-statusWidth))
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-20-statusColWidth))
+					line = stateBadge + pad + statusCol + " " + selectedStyle.Render(padRight(rest, innerW-12-statusColWidth))
 				} else {
 					line = lipgloss.NewStyle().
 						Foreground(lipgloss.Color("252")).
