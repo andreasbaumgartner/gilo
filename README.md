@@ -129,9 +129,9 @@ Launch `gilo` from any GitHub repository directory. The application opens in ful
 |      Issues List        |       Issue Detail               |
 |  [Filter: Open]         |  #42 Fix login flow              |
 |                         |  -------------------------------- |
-| [OPEN]  #42 Fix login   |  State: OPEN                     |
-| [OPEN]  #43 Add tests   |  Author: user                    |
-| [CLOSED] #41 Update CI  |  Created: 2025-01-15             |
+| [OPEN] [WORKING]  #42 Fix login  |  State: OPEN                |
+| [OPEN] [QUESTION] #43 Add tests  |  Author: user               |
+| [CLOSED]          #41 Update CI  |  Created: 2025-01-15        |
 |                         |  Labels: bug, enhancement        |
 |                         |                                  |
 |                         |  -- Description --               |
