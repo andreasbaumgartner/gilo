@@ -1,0 +1,34 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(devcontainer up:*)",
+      "Bash(devpod --version)",
+      "Bash(devpod version:*)",
+      "Bash(devpod up:*)",
+      "Read(//dev/**)",
+      "Read(//home/alpha/dev/**)",
+      "Bash(find /home/alpha/dev -maxdepth 3 -path *GoAPI*/.devcontainer* -o -path *goapi*/.devcontainer*)",
+      "Read(//home/alpha/GoAPI/**)",
+      "Read(//home/alpha/**)",
+      "Bash(find /home/alpha -maxdepth 4 -path */devpod* -o -path */.devpod*)",
+      "Bash(env)",
+      "Bash(stow --version)",
+      "Bash(devpod list:*)",
+      "Bash(go mod:*)",
+      "Bash(go build:*)",
+      "Bash(gh issue:*)",
+      "Bash(git pull:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rebase:*)",
+      "Bash(git checkout:*)",
+      "Bash(git push:*)",
+      "Bash(useradd -m -s /bin/bash devuser)",
+      "Bash(chown -R devuser:devuser /workspaces/gilo)",
+      "Bash(git config:*)",
+      "Bash(curl:*)",
+      "Bash(chmod:*)"
+    ]
+  }
+}

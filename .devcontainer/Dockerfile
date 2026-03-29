@@ -14,6 +14,7 @@ RUN apt-get update && apt-get install -y \
     bat \
     fd-find \
     xclip \
+    sudo \
     && rm -rf /var/lib/apt/lists/*
 
 # Symlink bat/fd (Ubuntu packages them with different names)
@@ -55,3 +56,14 @@ RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/i
 # Set default shell to zsh
 RUN chsh -s /bin/zsh root
 ENV SHELL=/bin/zsh
+
+# Create a separate user for running Claude Code with full permissions
+RUN useradd -m -s /bin/zsh -G sudo claudeuser \
+    && echo "claudeuser ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/claudeuser \
+    && chmod 0440 /etc/sudoers.d/claudeuser
+
+# Give claudeuser access to Go tooling
+RUN mkdir -p /home/claudeuser/go/bin \
+    && cp -r /root/go/bin/* /home/claudeuser/go/bin/ \
+    && chown -R claudeuser:claudeuser /home/claudeuser/go
+ENV PATH="/home/claudeuser/go/bin:${PATH}"
