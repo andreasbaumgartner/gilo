@@ -29,7 +29,10 @@ A Terminal User Interface (TUI) for managing GitHub issues and AI agents, writte
 
 ### Tmux Status Tracking
 - Live tmux window monitoring with a polling indicator
-- See which issues have active tmux sessions (marked with a spinning indicator)
+- See which issues have active tmux sessions with status badges:
+  - **WORKING** — Claude is actively processing
+  - **QUESTION** — Claude is waiting for user input
+  - **REVIEW** — Claude has finished and exited
 - View the last output line from active tmux panes
 
 ## Prerequisites
