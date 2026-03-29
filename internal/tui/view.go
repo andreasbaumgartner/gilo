@@ -84,6 +84,23 @@ func (m model) renderModal() string {
 		hint := dimStyle.Render("y confirm  │  n/esc cancel")
 		return modalStyle.Render(strings.Join([]string{title, "", warning, "", hint}, "\n"))
 
+	case modalCloseConfirm:
+		action := "Close"
+		prompt := "Are you sure you want to close this issue?"
+		if m.modalCloseAction == "reopen" {
+			action = "Reopen"
+			prompt = "Are you sure you want to reopen this issue?"
+		}
+		title := titleStyle.Render(fmt.Sprintf("%s Issue #%d", action, m.modalIssue))
+		var body string
+		if m.modalStatus != "" {
+			body = m.modalStatus
+		} else {
+			body = prompt
+		}
+		hint := dimStyle.Render("y confirm  │  n/esc cancel")
+		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
 	case modalDeleteConfirm:
 		title := titleStyle.Render(fmt.Sprintf("Delete Issue #%d", m.modalIssue))
 		var body string
@@ -162,6 +179,7 @@ func (m model) renderModal() string {
 			"  o/enter   Open issue in browser",
 			"  c         Comment on issue",
 			"  n         Create new issue",
+			"  x         Close/reopen issue",
 			"  d         Delete issue",
 			"  l         Manage labels",
 			"",
@@ -377,7 +395,7 @@ func (m model) renderStatusBar() string {
 		keys = []string{"j/k navigate", "space toggle", "ctrl+d submit", "esc cancel"}
 	case modalHelp:
 		keys = []string{"esc/? close"}
-	case modalDeleteConfirm:
+	case modalDeleteConfirm, modalCloseConfirm:
 		keys = []string{"y confirm", "n/esc cancel"}
 	case modalBrowser, modalWorktree, modalClaudeTask:
 		keys = []string{"esc dismiss"}
@@ -400,6 +418,7 @@ func (m model) renderStatusBar() string {
 			permLabel,
 			"t theme:" + activeScheme.Name,
 			"l labels",
+			"x close/reopen",
 			"d delete",
 			"n new issue",
 			"? help",
