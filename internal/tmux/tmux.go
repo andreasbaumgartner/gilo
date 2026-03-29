@@ -169,6 +169,15 @@ func isClaudeProcess(cmd string) bool {
 	return true
 }
 
+// SelectWindow switches tmux focus to the window with the given name.
+// Returns true if the window was found and selected, false otherwise.
+func SelectWindow(name string) bool {
+	if os.Getenv("TMUX") == "" {
+		return false
+	}
+	return exec.Command("tmux", "select-window", "-t", name).Run() == nil
+}
+
 func WindowExists(branch string) bool {
 	out, err := exec.Command("tmux", "list-windows", "-F", "#{window_name}").Output()
 	if err != nil {
