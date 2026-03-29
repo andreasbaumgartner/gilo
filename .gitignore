@@ -29,3 +29,9 @@ vendor/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# DevPod internal files (auto-generated, environment-specific)
+.devcontainer/.devpod-internal/
+
+# Claude Code local settings (user-specific)
+.claude/settings.local.json
