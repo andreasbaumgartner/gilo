@@ -9,6 +9,7 @@ import (
 
 	"github.com/andreasbaumgartner/gilo/internal/github"
 	"github.com/andreasbaumgartner/gilo/internal/settings"
+	"github.com/andreasbaumgartner/gilo/internal/tmux"
 )
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -33,6 +34,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateViewport()
 		}
 
+	case tmuxJumpMsg:
+		if msg.ok {
+			m.modal = modalNone
+			m.modalStatus = ""
+		} else {
+			m.modalStatus = fmt.Sprintf("Failed to switch to tmux window: %s", msg.windowName)
+		}
+
 	case issuesLoadedMsg:
 		m.issues = []github.Issue(msg)
 		m.loaded = true
@@ -41,6 +50,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.cursor >= len(filtered) {
 			m.cursor = max(0, len(filtered)-1)
 		}
+		m.clampListOffset()
 		m.updateViewport()
 
 	case errMsg:
@@ -354,6 +364,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			filtered := m.filteredIssues()
 			if m.cursor < len(filtered)-1 {
 				m.cursor++
+				m.clampListOffset()
 				m.updateViewport()
 			}
 		} else {
@@ -364,13 +375,41 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.focus == focusList {
 			if m.cursor > 0 {
 				m.cursor--
+				m.clampListOffset()
 				m.updateViewport()
 			}
 		} else {
 			m.viewport.ScrollUp(1)
 		}
 
-	case "enter", "o":
+	case "enter":
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
+			issue := filtered[m.cursor]
+			// If a tmux session exists for this issue, jump to it.
+			for _, p := range m.tmuxPanes {
+				if p.IssueNum == issue.Number {
+					windowName := p.WindowName
+					m.modal = modalWorktree
+					m.modalIssue = issue.Number
+					m.modalStatus = "Jumping to tmux window..."
+					return m, func() tea.Msg {
+						ok := tmux.SelectWindow(windowName)
+						return tmuxJumpMsg{windowName: windowName, ok: ok}
+					}
+				}
+			}
+			// No tmux session — fall back to opening in browser.
+			m.modal = modalBrowser
+			m.modalIssue = issue.Number
+			m.modalStatus = ""
+			num := m.modalIssue
+			return m, func() tea.Msg {
+				return browserOpenedMsg{github.OpenInBrowser(num)}
+			}
+		}
+
+	case "o":
 		filtered := m.filteredIssues()
 		if len(filtered) > 0 {
 			m.modal = modalBrowser
@@ -508,6 +547,8 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor >= len(filtered) {
 			m.cursor = max(0, len(filtered)-1)
 		}
+		m.listOffset = 0
+		m.clampListOffset()
 		m.updateViewport()
 
 	case "t":
@@ -529,6 +570,37 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *model) clampListOffset() {
+	innerH := m.mainH() - 2
+	// 2 rows for header + blank line
+	visibleRows := innerH - 2
+
+	// Account for scroll indicator rows
+	if m.listOffset > 0 {
+		visibleRows-- // up indicator
+	}
+	filtered := m.filteredIssues()
+	if m.listOffset+visibleRows < len(filtered) {
+		visibleRows-- // down indicator
+	}
+	if visibleRows < 1 {
+		visibleRows = 1
+	}
+
+	// Scroll down if cursor is below visible area
+	if m.cursor >= m.listOffset+visibleRows {
+		m.listOffset = m.cursor - visibleRows + 1
+	}
+	// Scroll up if cursor is above visible area
+	if m.cursor < m.listOffset {
+		m.listOffset = m.cursor
+	}
+	// Clamp offset
+	if m.listOffset < 0 {
+		m.listOffset = 0
+	}
 }
 
 func (m *model) updateViewport() {
