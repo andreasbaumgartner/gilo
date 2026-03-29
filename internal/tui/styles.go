@@ -44,6 +44,12 @@ var (
 			Bold(true).
 			Padding(0, 1)
 
+	workingBadge = lipgloss.NewStyle().
+			Background(lipgloss.Color("58")).
+			Foreground(lipgloss.Color("11")).
+			Bold(true).
+			Padding(0, 1)
+
 	keybindStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("236")).
 			Foreground(lipgloss.Color("252")).
