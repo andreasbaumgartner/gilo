@@ -8,10 +8,7 @@ A Terminal User Interface (TUI) for managing GitHub issues and AI agents, writte
 
 ## Screenshots
 
-### Create New Issue
-![Create New Issue](assets/create-issue.png)
-
-### Issues List
+### Status Claude Code in List
 ![Issues List](assets/issues-list.png)
 
 ### Issue Detail View
