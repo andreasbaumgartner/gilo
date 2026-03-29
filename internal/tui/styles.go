@@ -23,6 +23,7 @@ var (
 	openBadge      lipgloss.Style
 	closedBadge    lipgloss.Style
 	workingBadge   lipgloss.Style
+	questionBadge  lipgloss.Style
 	reviewBadge    lipgloss.Style
 	keybindStyle   lipgloss.Style
 	modalStyle     lipgloss.Style
@@ -79,6 +80,12 @@ func applyColorScheme(cs ColorScheme) {
 	workingBadge = lipgloss.NewStyle().
 		Background(cs.WorkingBadgeBg).
 		Foreground(cs.WorkingBadgeFg).
+		Bold(true).
+		Padding(0, 1)
+
+	questionBadge = lipgloss.NewStyle().
+		Background(cs.QuestionBadgeBg).
+		Foreground(cs.QuestionBadgeFg).
 		Bold(true).
 		Padding(0, 1)
 

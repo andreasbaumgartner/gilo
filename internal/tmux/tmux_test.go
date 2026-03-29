@@ -195,8 +195,11 @@ func TestPaneStatusConstants(t *testing.T) {
 	if StatusWorking != 0 {
 		t.Errorf("StatusWorking = %d, want 0", StatusWorking)
 	}
-	if StatusReview != 1 {
-		t.Errorf("StatusReview = %d, want 1", StatusReview)
+	if StatusQuestion != 1 {
+		t.Errorf("StatusQuestion = %d, want 1", StatusQuestion)
+	}
+	if StatusReview != 2 {
+		t.Errorf("StatusReview = %d, want 2", StatusReview)
 	}
 }
 

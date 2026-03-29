@@ -40,7 +40,10 @@ A Terminal User Interface (TUI) for managing GitHub issues and AI agents, writte
 
 ### Tmux Status Tracking
 - Live tmux window monitoring with a polling indicator
-- See which issues have active tmux sessions (marked with a spinning indicator)
+- See which issues have active tmux sessions with status badges:
+  - **WORKING** — Claude is actively processing
+  - **QUESTION** — Claude is waiting for user input
+  - **REVIEW** — Claude has finished and exited
 - View the last output line from active tmux panes
 
 ## Prerequisites
@@ -137,9 +140,9 @@ Launch `gilo` from any GitHub repository directory. The application opens in ful
 |      Issues List        |       Issue Detail               |
 |  [Filter: Open]         |  #42 Fix login flow              |
 |                         |  -------------------------------- |
-| [OPEN]  #42 Fix login   |  State: OPEN                     |
-| [OPEN]  #43 Add tests   |  Author: user                    |
-| [CLOSED] #41 Update CI  |  Created: 2025-01-15             |
+| [OPEN] [WORKING]  #42 Fix login  |  State: OPEN                |
+| [OPEN] [QUESTION] #43 Add tests  |  Author: user               |
+| [CLOSED]          #41 Update CI  |  Created: 2025-01-15        |
 |                         |  Labels: bug, enhancement        |
 |                         |                                  |
 |                         |  -- Description --               |

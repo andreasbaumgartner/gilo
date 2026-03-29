@@ -16,6 +16,7 @@ type PaneStatus int
 
 const (
 	StatusWorking PaneStatus = iota
+	StatusQuestion
 	StatusReview
 )
 
@@ -95,10 +96,9 @@ func FetchStatus() []Pane {
 			if !isClaudeProcess(cmd) {
 				status = StatusReview
 			} else if isClaudeIdle(capturedOutput) {
-				// Claude Code stays in interactive mode after finishing
-				// work. Detect the idle input prompt to determine that
-				// the agent is done and the issue is ready for review.
-				status = StatusReview
+				// Claude Code is still running but showing the input
+				// prompt — it is asking the user a question.
+				status = StatusQuestion
 			}
 		}
 
