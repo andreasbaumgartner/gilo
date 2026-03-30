@@ -134,6 +134,8 @@ type model struct {
 	sortCol sortColumn
 	sortAsc bool
 
+	pendingKey string // prefix key waiting for second keystroke (e.g. "f")
+
 	settings settings.Settings
 }
 

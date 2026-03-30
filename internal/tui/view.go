@@ -188,9 +188,11 @@ func (m model) renderModal() string {
 			"  " + greenStyle.Render("↑/k") + "       move up",
 			"  " + greenStyle.Render("↓/j") + "       move down",
 			"  " + greenStyle.Render("tab") + "       switch panel",
-			"  " + greenStyle.Render("f") + "         cycle filter",
-			"  " + greenStyle.Render("a") + "         cycle sort column",
-			"  " + greenStyle.Render("A") + "         toggle sort direction",
+			"",
+			dimStyle.Render("── filter & sort (f …) ──"),
+			"  " + greenStyle.Render("ff") + "        cycle filter",
+			"  " + greenStyle.Render("fs") + "        cycle sort column",
+			"  " + greenStyle.Render("fd") + "        toggle sort direction",
 			"",
 			dimStyle.Render("── actions ──"),
 			"  " + greenStyle.Render("enter") + "     jump / open",
@@ -517,6 +519,15 @@ func (m model) renderStatusBar() string {
 	case modalPermissionWarning:
 		keys = []string{"y confirm", "n/esc cancel"}
 	default:
+		if m.pendingKey == "f" {
+			keys = []string{
+				"f… ff filter",
+				"fs sort column",
+				"fd sort direction",
+				"esc cancel",
+			}
+			break
+		}
 		permLabel := "p permissions:off"
 		if m.settings.DangerouslySkipPermissions {
 			permLabel = "p permissions:ON"
@@ -528,8 +539,7 @@ func (m model) renderStatusBar() string {
 		keys = []string{
 			"↑↓/jk navigate",
 			"tab panel",
-			"f filter",
-			"a/A sort",
+			"f filter/sort",
 			"g refresh",
 			"enter jump",
 			"o browser",
