@@ -397,6 +397,47 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle pending prefix key (e.g. "f" for filter/sort submenu)
+	if m.pendingKey == "f" {
+		m.pendingKey = ""
+		switch msg.String() {
+		case "f":
+			// Cycle filter: OPEN → CLOSED → ALL → OPEN
+			switch m.stateFilter {
+			case "OPEN":
+				m.stateFilter = "CLOSED"
+			case "CLOSED":
+				m.stateFilter = ""
+			default:
+				m.stateFilter = "OPEN"
+			}
+			filtered := m.filteredIssues()
+			if m.cursor >= len(filtered) {
+				m.cursor = max(0, len(filtered)-1)
+			}
+			m.listOffset = 0
+			m.clampListOffset()
+			m.updateViewport()
+		case "s":
+			// Cycle to next sort column (descending by default)
+			m.sortCol = (m.sortCol + 1) % sortColumn(len(sortColumnNames))
+			m.sortAsc = false
+			m.cursor = 0
+			m.listOffset = 0
+			m.clampListOffset()
+			m.updateViewport()
+		case "d":
+			// Toggle sort direction for current column
+			m.sortAsc = !m.sortAsc
+			m.cursor = 0
+			m.listOffset = 0
+			m.clampListOffset()
+			m.updateViewport()
+		}
+		// Any unrecognized key just cancels the pending state
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -601,38 +642,8 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "f":
-		switch m.stateFilter {
-		case "OPEN":
-			m.stateFilter = "CLOSED"
-		case "CLOSED":
-			m.stateFilter = ""
-		default:
-			m.stateFilter = "OPEN"
-		}
-		filtered := m.filteredIssues()
-		if m.cursor >= len(filtered) {
-			m.cursor = max(0, len(filtered)-1)
-		}
-		m.listOffset = 0
-		m.clampListOffset()
-		m.updateViewport()
-
-	case "a":
-		// Cycle to next sort column (descending by default)
-		m.sortCol = (m.sortCol + 1) % sortColumn(len(sortColumnNames))
-		m.sortAsc = false
-		m.cursor = 0
-		m.listOffset = 0
-		m.clampListOffset()
-		m.updateViewport()
-
-	case "A":
-		// Toggle sort direction for current column
-		m.sortAsc = !m.sortAsc
-		m.cursor = 0
-		m.listOffset = 0
-		m.clampListOffset()
-		m.updateViewport()
+		m.pendingKey = "f"
+		return m, nil
 
 	case "t":
 		current := m.settings.ColorScheme
