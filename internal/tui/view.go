@@ -91,6 +91,9 @@ func (m model) renderModal() string {
 		if m.settings.AdditionalContext {
 			content += "\n" + lipgloss.NewStyle().Foreground(colorActive).Render("📋 Sending with additional context (labels, comments, metadata)")
 		}
+		if m.settings.PlanMode {
+			content += "\n" + lipgloss.NewStyle().Foreground(colorActive).Render("📝 Running with --plan (plan mode)")
+		}
 		return style.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
 
 	case modalPermissionWarning:
@@ -266,6 +269,7 @@ func (m model) renderModal() string {
 			dimStyle.Render("── settings ──"),
 			"  " + greenStyle.Render("p") + "         permissions",
 			"  " + greenStyle.Render("i") + "         additional context",
+			"  " + greenStyle.Render("P") + "         plan mode",
 			"  " + greenStyle.Render("r") + "         allow-root",
 			"  " + greenStyle.Render("t") + "         color scheme",
 			"  " + greenStyle.Render("m") + "         cycle issues max",
@@ -664,6 +668,10 @@ func (m model) renderStatusBar() string {
 		if m.settings.AdditionalContext {
 			ctxLabel = "i context:ON"
 		}
+		planLabel := "P plan:off"
+		if m.settings.PlanMode {
+			planLabel = "P plan:ON"
+		}
 		keys = []string{
 			"↑↓/jk navigate",
 			"tab panel",
@@ -677,6 +685,7 @@ func (m model) renderStatusBar() string {
 			"K close window",
 			permLabel,
 			ctxLabel,
+			planLabel,
 			fmt.Sprintf("m max:%d", m.settings.GetIssuesMax()),
 			"t " + activeScheme.Name,
 			"l labels",
