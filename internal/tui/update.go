@@ -16,6 +16,25 @@ import (
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
+	case tea.MouseMsg:
+		switch msg.Action {
+		case tea.MouseActionPress:
+			// Start drag if clicking near the panel border (listW boundary ±1)
+			border := m.listW()
+			if msg.X >= border-1 && msg.X <= border+1 {
+				m.draggingBorder = true
+			}
+		case tea.MouseActionRelease:
+			m.draggingBorder = false
+		case tea.MouseActionMotion:
+			if m.draggingBorder {
+				m.listWidthOverride = msg.X
+				m.viewport.Width = m.detailInnerW()
+				m.viewport.Height = m.detailInnerH()
+				m.updateViewport()
+			}
+		}
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -118,6 +137,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case issueReopenedMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Error: %v", msg.err)
+		} else {
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
+		}
+
+	case issueMergedMsg:
 		if msg.err != nil {
 			m.modalStatus = fmt.Sprintf("Error: %v", msg.err)
 		} else {
@@ -305,6 +333,54 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case modalMerge:
+		switch msg.String() {
+		case "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, nil
+		case "j", "down":
+			targets := m.mergeTargets()
+			if m.mergeCursor < len(targets)-1 {
+				m.mergeCursor++
+			}
+			return m, nil
+		case "k", "up":
+			if m.mergeCursor > 0 {
+				m.mergeCursor--
+			}
+			return m, nil
+		case "enter":
+			targets := m.mergeTargets()
+			if len(targets) > 0 {
+				m.mergeTarget = targets[m.mergeCursor].Number
+				m.modal = modalMergeConfirm
+				m.modalStatus = ""
+			}
+			return m, nil
+		}
+		return m, nil
+
+	case modalMergeConfirm:
+		switch msg.String() {
+		case "y", "Y":
+			m.modalStatus = "Merging issues..."
+			var source, target github.Issue
+			for _, issue := range m.issues {
+				if issue.Number == m.modalIssue {
+					source = issue
+				}
+				if issue.Number == m.mergeTarget {
+					target = issue
+				}
+			}
+			return m, mergeIssuesCmd(source, target)
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
 	case modalCloseConfirm:
 		switch msg.String() {
 		case "y", "Y":
@@ -465,6 +541,47 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle pending prefix key (e.g. "f" for filter/sort submenu)
+	if m.pendingKey == "f" {
+		m.pendingKey = ""
+		switch msg.String() {
+		case "f":
+			// Cycle filter: OPEN → CLOSED → ALL → OPEN
+			switch m.stateFilter {
+			case "OPEN":
+				m.stateFilter = "CLOSED"
+			case "CLOSED":
+				m.stateFilter = ""
+			default:
+				m.stateFilter = "OPEN"
+			}
+			filtered := m.filteredIssues()
+			if m.cursor >= len(filtered) {
+				m.cursor = max(0, len(filtered)-1)
+			}
+			m.listOffset = 0
+			m.clampListOffset()
+			m.updateViewport()
+		case "s":
+			// Cycle to next sort column (descending by default)
+			m.sortCol = (m.sortCol + 1) % sortColumn(len(sortColumnNames))
+			m.sortAsc = false
+			m.cursor = 0
+			m.listOffset = 0
+			m.clampListOffset()
+			m.updateViewport()
+		case "d":
+			// Toggle sort direction for current column
+			m.sortAsc = !m.sortAsc
+			m.cursor = 0
+			m.listOffset = 0
+			m.clampListOffset()
+			m.updateViewport()
+		}
+		// Any unrecognized key just cancels the pending state
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -475,6 +592,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.focus = focusList
 		}
+		m.updateViewport()
 
 	case "j", "down":
 		if m.focus == focusList {
@@ -555,7 +673,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modal = modalClaudeTask
 			m.modalIssue = issue.Number
 			m.modalStatus = ""
-			return m, createClaudeTaskCmd(issue, msg.String() == "S", m.settings.DangerouslySkipPermissions, m.settings.AdditionalContext)
+			return m, createClaudeTaskCmd(issue, msg.String() == "S", m.settings.DangerouslySkipPermissions, m.settings.AdditionalContext, m.settings.PlanMode)
 		}
 
 	case "p":
@@ -631,6 +749,16 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "M":
+		filtered := m.filteredIssues()
+		if len(filtered) > 1 {
+			m.modal = modalMerge
+			m.modalIssue = filtered[m.cursor].Number
+			m.modalStatus = ""
+			m.mergeCursor = 0
+		}
+		return m, nil
+
 	case "d":
 		filtered := m.filteredIssues()
 		if len(filtered) > 0 {
@@ -673,38 +801,8 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "f":
-		switch m.stateFilter {
-		case "OPEN":
-			m.stateFilter = "CLOSED"
-		case "CLOSED":
-			m.stateFilter = ""
-		default:
-			m.stateFilter = "OPEN"
-		}
-		filtered := m.filteredIssues()
-		if m.cursor >= len(filtered) {
-			m.cursor = max(0, len(filtered)-1)
-		}
-		m.listOffset = 0
-		m.clampListOffset()
-		m.updateViewport()
-
-	case "a":
-		// Cycle to next sort column (descending by default)
-		m.sortCol = (m.sortCol + 1) % sortColumn(len(sortColumnNames))
-		m.sortAsc = false
-		m.cursor = 0
-		m.listOffset = 0
-		m.clampListOffset()
-		m.updateViewport()
-
-	case "A":
-		// Toggle sort direction for current column
-		m.sortAsc = !m.sortAsc
-		m.cursor = 0
-		m.listOffset = 0
-		m.clampListOffset()
-		m.updateViewport()
+		m.pendingKey = "f"
+		return m, nil
 
 	case "t":
 		current := m.settings.ColorScheme
@@ -725,6 +823,11 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "i":
 		m.settings.AdditionalContext = !m.settings.AdditionalContext
+		settings.Save(m.settings)
+		return m, nil
+
+	case "P":
+		m.settings.PlanMode = !m.settings.PlanMode
 		settings.Save(m.settings)
 		return m, nil
 

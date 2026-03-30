@@ -83,6 +83,12 @@ func deleteIssueCmd(issueNum int) tea.Cmd {
 	}
 }
 
+func mergeIssuesCmd(source, target github.Issue) tea.Cmd {
+	return func() tea.Msg {
+		return issueMergedMsg{github.MergeIssues(source, target)}
+	}
+}
+
 func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
@@ -93,14 +99,14 @@ func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	}
 }
 
-func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions bool, additionalContext bool) tea.Cmd {
+func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions bool, additionalContext bool, planMode bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
 		if err != nil {
 			return claudeTaskCreatedMsg{tmux.ClaudeResult{Err: err, Branch: branch}}
 		}
 		prompt := buildClaudePrompt(issue, additionalContext)
-		return claudeTaskCreatedMsg{tmux.OpenClaude(branch, path, existed, prompt, split, dangerouslySkipPermissions)}
+		return claudeTaskCreatedMsg{tmux.OpenClaude(branch, path, existed, prompt, split, dangerouslySkipPermissions, planMode)}
 	}
 }
 

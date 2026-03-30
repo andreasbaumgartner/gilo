@@ -27,8 +27,10 @@ type ColorScheme struct {
 	QuestionBadgeFg lipgloss.Color
 	PRBadgeBg       lipgloss.Color
 	PRBadgeFg       lipgloss.Color
-	PRMergedBadgeBg lipgloss.Color
-	PRMergedBadgeFg lipgloss.Color
+	PRMergedBadgeBg  lipgloss.Color
+	PRMergedBadgeFg  lipgloss.Color
+	PRClosedBadgeBg  lipgloss.Color
+	PRClosedBadgeFg  lipgloss.Color
 
 	KeybindBg lipgloss.Color
 	KeybindFg lipgloss.Color
@@ -78,8 +80,10 @@ var schemeDefault = ColorScheme{
 	QuestionBadgeFg: lipgloss.Color("#f1fa8c"),
 	PRBadgeBg:       lipgloss.Color("#1a2a3a"),
 	PRBadgeFg:       lipgloss.Color("#8be9fd"),
-	PRMergedBadgeBg: lipgloss.Color("#2a1a3a"),
-	PRMergedBadgeFg: lipgloss.Color("#bd93f9"),
+	PRMergedBadgeBg:  lipgloss.Color("#2a1a3a"),
+	PRMergedBadgeFg:  lipgloss.Color("#bd93f9"),
+	PRClosedBadgeBg:  lipgloss.Color("#3a1a1a"),
+	PRClosedBadgeFg:  lipgloss.Color("#ff5555"),
 
 	KeybindBg: lipgloss.Color("#282a36"),
 	KeybindFg: lipgloss.Color("#f8f8f2"),
@@ -119,8 +123,10 @@ var schemeCatppuccin = ColorScheme{
 	QuestionBadgeFg: lipgloss.Color("#cba6f7"), // Mauve
 	PRBadgeBg:       lipgloss.Color("#1a3040"), // Dark sapphire
 	PRBadgeFg:       lipgloss.Color("#74c7ec"), // Sapphire
-	PRMergedBadgeBg: lipgloss.Color("#2a1a3a"), // Dark lavender
-	PRMergedBadgeFg: lipgloss.Color("#b4befe"), // Lavender
+	PRMergedBadgeBg:  lipgloss.Color("#2a1a3a"), // Dark lavender
+	PRMergedBadgeFg:  lipgloss.Color("#b4befe"), // Lavender
+	PRClosedBadgeBg:  lipgloss.Color("#4e1a2a"), // Dark red
+	PRClosedBadgeFg:  lipgloss.Color("#f38ba8"), // Red
 
 	KeybindBg: lipgloss.Color("#313244"), // Surface0
 	KeybindFg: lipgloss.Color("#cdd6f4"), // Text
@@ -160,8 +166,10 @@ var schemeKanagawa = ColorScheme{
 	QuestionBadgeFg: lipgloss.Color("#957fb8"), // Oni violet
 	PRBadgeBg:       lipgloss.Color("#1a2a3a"), // Dark wave blue
 	PRBadgeFg:       lipgloss.Color("#7fb4ca"), // Spring blue
-	PRMergedBadgeBg: lipgloss.Color("#2a1a30"), // Dark wisteria
-	PRMergedBadgeFg: lipgloss.Color("#938aa9"), // Spring violet
+	PRMergedBadgeBg:  lipgloss.Color("#2a1a30"), // Dark wisteria
+	PRMergedBadgeFg:  lipgloss.Color("#938aa9"), // Spring violet
+	PRClosedBadgeBg:  lipgloss.Color("#3a2020"), // Dark red
+	PRClosedBadgeFg:  lipgloss.Color("#c34043"), // Autumn red
 
 	KeybindBg: lipgloss.Color("#2a2a37"), // Sumi ink 3
 	KeybindFg: lipgloss.Color("#dcd7ba"), // Fuji white

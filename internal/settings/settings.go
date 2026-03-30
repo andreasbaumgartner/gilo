@@ -12,6 +12,7 @@ type Settings struct {
 	ColorScheme                string `json:"color_scheme,omitempty"`
 	IssuesMax                  int    `json:"issues_max,omitempty"`
 	AdditionalContext          bool   `json:"additional_context"`
+	PlanMode                   bool   `json:"plan_mode"`
 }
 
 const DefaultIssuesMax = 25

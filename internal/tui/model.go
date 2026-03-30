@@ -39,6 +39,7 @@ type issueCreatedMsg struct{ err error }
 type issueDeletedMsg struct{ err error }
 type issueClosedMsg struct{ err error }
 type issueReopenedMsg struct{ err error }
+type issueMergedMsg struct{ err error }
 type labelsLoadedMsg struct {
 	repoLabels  []github.RepoLabel
 	issueLabels map[string]bool
@@ -101,6 +102,8 @@ const (
 	modalPermissionWarning
 	modalKillWindowConfirm
 	modalWorktreeCleanup
+	modalMerge
+	modalMergeConfirm
 	modalHelp
 )
 
@@ -128,6 +131,9 @@ type model struct {
 	textareaBody textarea.Model
 	createFocus  int
 
+	mergeTarget int // issue number to merge into
+	mergeCursor int // cursor in the merge target list
+
 	repoLabels    []github.RepoLabel
 	labelSelected map[string]bool
 	labelOriginal map[string]bool
@@ -149,7 +155,12 @@ type model struct {
 	sortCol sortColumn
 	sortAsc bool
 
+	pendingKey string // prefix key waiting for second keystroke (e.g. "f")
+
 	settings settings.Settings
+
+	listWidthOverride int  // 0 = use default, >0 = user-dragged width
+	draggingBorder    bool // true while mouse is dragging the panel border
 }
 
 func initialModel() model {
@@ -200,6 +211,18 @@ func (m model) filteredIssues() []github.Issue {
 		return !less
 	})
 
+	return out
+}
+
+// mergeTargets returns all issues except the current modal issue, for use as
+// merge target candidates.
+func (m model) mergeTargets() []github.Issue {
+	var out []github.Issue
+	for _, issue := range m.filteredIssues() {
+		if issue.Number != m.modalIssue {
+			out = append(out, issue)
+		}
+	}
 	return out
 }
 

@@ -141,6 +141,7 @@ func TestBuildClaudeCommand(t *testing.T) {
 		name            string
 		prompt          string
 		skipPermissions bool
+		planMode        bool
 		wantContains    string
 		wantNotContains string
 	}{
@@ -173,18 +174,37 @@ func TestBuildClaudeCommand(t *testing.T) {
 			prompt:       "",
 			wantContains: `claude ""`,
 		},
+		{
+			name:         "with plan mode",
+			prompt:       "Fix issue #42",
+			planMode:     true,
+			wantContains: "--plan",
+		},
+		{
+			name:            "without plan mode",
+			prompt:          "Fix issue #42",
+			planMode:        false,
+			wantNotContains: "--plan",
+		},
+		{
+			name:            "with skip permissions and plan mode",
+			prompt:          "Fix issue #42",
+			skipPermissions: true,
+			planMode:        true,
+			wantContains:    "--plan",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := BuildClaudeCommand(tt.prompt, tt.skipPermissions)
+			got := BuildClaudeCommand(tt.prompt, tt.skipPermissions, tt.planMode)
 			if tt.wantContains != "" && !contains(got, tt.wantContains) {
-				t.Errorf("BuildClaudeCommand(%q, %v) = %q, want it to contain %q",
-					tt.prompt, tt.skipPermissions, got, tt.wantContains)
+				t.Errorf("BuildClaudeCommand(%q, %v, %v) = %q, want it to contain %q",
+					tt.prompt, tt.skipPermissions, tt.planMode, got, tt.wantContains)
 			}
 			if tt.wantNotContains != "" && contains(got, tt.wantNotContains) {
-				t.Errorf("BuildClaudeCommand(%q, %v) = %q, want it NOT to contain %q",
-					tt.prompt, tt.skipPermissions, got, tt.wantNotContains)
+				t.Errorf("BuildClaudeCommand(%q, %v, %v) = %q, want it NOT to contain %q",
+					tt.prompt, tt.skipPermissions, tt.planMode, got, tt.wantNotContains)
 			}
 		})
 	}
