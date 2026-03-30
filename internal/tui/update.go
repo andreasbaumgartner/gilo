@@ -34,6 +34,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateViewport()
 		}
 
+	case tmuxWindowKilledMsg:
+		if msg.ok {
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, fetchTmuxStatusCmd
+		}
+		m.modalStatus = fmt.Sprintf("Failed to close tmux window: %s", msg.windowName)
+
 	case tmuxJumpMsg:
 		if msg.ok {
 			m.modal = modalNone
@@ -222,6 +230,21 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modalStatus = "Deleting issue..."
 			num := m.modalIssue
 			return m, deleteIssueCmd(num)
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
+	case modalKillWindowConfirm:
+		switch msg.String() {
+		case "y", "Y":
+			windowName := m.modalKillWindowName
+			m.modalStatus = "Closing tmux window..."
+			return m, func() tea.Msg {
+				ok := tmux.KillWindow(windowName)
+				return tmuxWindowKilledMsg{windowName: windowName, ok: ok}
+			}
 		case "n", "N", "esc":
 			m.modal = modalNone
 			m.modalStatus = ""
@@ -520,6 +543,22 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modal = modalDeleteConfirm
 			m.modalIssue = filtered[m.cursor].Number
 			m.modalStatus = ""
+		}
+		return m, nil
+
+	case "K":
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
+			issue := filtered[m.cursor]
+			for _, p := range m.tmuxPanes {
+				if p.IssueNum == issue.Number {
+					m.modal = modalKillWindowConfirm
+					m.modalIssue = issue.Number
+					m.modalKillWindowName = p.WindowName
+					m.modalStatus = ""
+					return m, nil
+				}
+			}
 		}
 		return m, nil
 

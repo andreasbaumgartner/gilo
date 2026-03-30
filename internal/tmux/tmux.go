@@ -194,6 +194,12 @@ func SelectWindow(name string) bool {
 	return exec.Command("tmux", "select-window", "-t", name).Run() == nil
 }
 
+// KillWindow closes the tmux window with the given name.
+// Returns true if the window was found and killed, false otherwise.
+func KillWindow(name string) bool {
+	return exec.Command("tmux", "kill-window", "-t", name).Run() == nil
+}
+
 func WindowExists(branch string) bool {
 	out, err := exec.Command("tmux", "list-windows", "-F", "#{window_name}").Output()
 	if err != nil {
