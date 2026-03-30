@@ -15,6 +15,25 @@ import (
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
+	case tea.MouseMsg:
+		switch msg.Action {
+		case tea.MouseActionPress:
+			// Start drag if clicking near the panel border (listW boundary ±1)
+			border := m.listW()
+			if msg.X >= border-1 && msg.X <= border+1 {
+				m.draggingBorder = true
+			}
+		case tea.MouseActionRelease:
+			m.draggingBorder = false
+		case tea.MouseActionMotion:
+			if m.draggingBorder {
+				m.listWidthOverride = msg.X
+				m.viewport.Width = m.detailInnerW()
+				m.viewport.Height = m.detailInnerH()
+				m.updateViewport()
+			}
+		}
+
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -429,6 +448,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.focus = focusList
 		}
+		m.updateViewport()
 
 	case "j", "down":
 		if m.focus == focusList {

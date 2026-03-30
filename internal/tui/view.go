@@ -35,6 +35,22 @@ func (m model) View() string {
 		}
 		lines[m.height-1] = statusBar
 		screen = strings.Join(lines, "\n")
+	} else if fullTitle, row, ok := m.selectedTitleTruncated(); ok {
+		// Show tooltip for truncated issue title
+		maxW := m.listW() - 4
+		if maxW < 10 {
+			maxW = 10
+		}
+		tooltip := tooltipStyle.Width(maxW).Render(fullTitle)
+		// Position tooltip just below the selected row inside the list panel
+		// +1 for panel border, +4 for header rows (title + blank + column header + separator)
+		scrollOffset := 0
+		if m.listOffset > 0 {
+			scrollOffset = 1 // "↑ N more" indicator row
+		}
+		tooltipY := 1 + 4 + scrollOffset + (row - m.listOffset) + 1
+		tooltipX := 1 // inside left panel border
+		screen = overlayAt(screen, tooltip, tooltipX, tooltipY, m.width, m.height)
 	}
 
 	return screen
@@ -255,8 +271,26 @@ func (m model) renderList() string {
 		header = dimStyle.Render("Issues") + " " + dimStyle.Render(fmt.Sprintf("(%d)", count)) + " " + dimStyle.Render(filterLabel) + " " + sortLabel + refreshIndicator
 	}
 
+	// Column header row matching data layout
+	const statusColWidth = 12
+	const prColWidth = 12
+	colPrefixW := 4 + 6
+	colRightW := statusColWidth + prColWidth
+	colTitleW := innerW - colPrefixW - colRightW
+	if colTitleW < 4 {
+		colTitleW = 4
+	}
+	colLeft := "  " + dimStyle.Render(padRight("Issue", colTitleW+8))
+	colRight := dimStyle.Render(padRight(" Status", statusColWidth)) + dimStyle.Render(padRight(" PR", prColWidth))
+	colHeaderGap := innerW - lipgloss.Width(colLeft) - lipgloss.Width(colRight)
+	if colHeaderGap < 1 {
+		colHeaderGap = 1
+	}
+	colHeader := colLeft + strings.Repeat(" ", colHeaderGap) + colRight
+	separator := dimStyle.Render(strings.Repeat("─", innerW))
+
 	var rows []string
-	rows = append(rows, header, "")
+	rows = append(rows, header, "", colHeader, separator)
 
 	if !m.loaded {
 		rows = append(rows, "  "+dimStyle.Render("Loading..."))
@@ -290,9 +324,12 @@ func (m model) renderList() string {
 			i := idx
 			issue := filtered[idx]
 
-			stateBadge := openBadge.Render("open")
+			stateDot := greenStyle.Render("●")
 			if issue.State == "CLOSED" {
-				stateBadge = closedBadge.Render("closed")
+				stateDot = redStyle.Render("●")
+			}
+			if pr, ok := m.linkedPRs[issue.Number]; ok && pr.State == "OPEN" {
+				stateDot = yellowStyle.Render("●")
 			}
 
 			statusBadge := ""
@@ -316,43 +353,61 @@ func (m model) renderList() string {
 				case "MERGED":
 					prCol = prMergedBadge.Render("merged")
 				case "CLOSED":
-					prCol = prMergedBadge.Render("PR closed")
+					prCol = prClosedBadge.Render("closed")
 				default:
 					prCol = prBadge.Render("PR")
 				}
 			}
 
-			// Fixed-width columns for consistent alignment
-			const statusColWidth = 12
-			const prColWidth = 12
+			// Build right-aligned status + PR columns
 			statusCol := padRight(" "+statusBadge, statusColWidth)
 			prColumn := padRight(" "+prCol, prColWidth)
+			rightCols := statusCol + prColumn
 
-			pad := ""
-			if issue.State != "CLOSED" {
-				pad = " "
+			// Calculate how much space the title can use
+			// Layout: "▶ ● #1234 title... status pr" or "  ● #1234 title... status pr"
+			prefixW := 4 + 6 // "▶ ●" or "  ●" (4) + "#1234 " (6)
+			rightW := statusColWidth + prColWidth
+			titleMaxW := innerW - prefixW - rightW
+			if titleMaxW < 4 {
+				titleMaxW = 4
 			}
-
-			colsWidth := statusColWidth + prColWidth
-			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-15-colsWidth)
 
 			if i == m.cursor {
 				if active {
-					// Selected: green left accent + arrow indicator
 					indicator := greenStyle.Render("▶ ")
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-18-colsWidth))
-					line := indicator + stateBadge + pad + statusCol + prColumn + " " + selectedStyle.Render(rest)
+					numStr := fmt.Sprintf("#%-4d ", issue.Number)
+					t := truncate(issue.Title, titleMaxW)
+					leftPart := indicator + stateDot + " " + selectedStyle.Render(numStr+t)
+					gap := innerW - lipgloss.Width(leftPart) - lipgloss.Width(rightCols)
+					if gap < 1 {
+						gap = 1
+					}
+					line := leftPart + strings.Repeat(" ", gap) + rightCols
 					rows = append(rows, line)
 				} else {
-					line := "  " + stateBadge + pad + statusCol + prColumn + " " + num + " " + title
+					num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
+					t := truncate(issue.Title, titleMaxW)
+					leftPart := "  " + stateDot + " " + num + " " + t
+					gap := innerW - lipgloss.Width(leftPart) - lipgloss.Width(rightCols)
+					if gap < 1 {
+						gap = 1
+					}
+					line := leftPart + strings.Repeat(" ", gap) + rightCols
 					line = lipgloss.NewStyle().
 						Foreground(activeScheme.UnfocusedSelected).
 						Render(line)
 					rows = append(rows, line)
 				}
 			} else {
-				line := "  " + stateBadge + pad + statusCol + prColumn + " " + num + " " + title
+				num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
+				t := truncate(issue.Title, titleMaxW)
+				leftPart := "  " + stateDot + " " + num + " " + t
+				gap := innerW - lipgloss.Width(leftPart) - lipgloss.Width(rightCols)
+				if gap < 1 {
+					gap = 1
+				}
+				line := leftPart + strings.Repeat(" ", gap) + rightCols
 				rows = append(rows, line)
 			}
 		}
@@ -375,11 +430,45 @@ func (m model) renderList() string {
 
 func (m model) renderDetail() string {
 	active := m.focus == focusDetail
+	w := m.detailInnerW()
+
+	// Build fixed header with issue title matching left panel row count
+	filtered := m.filteredIssues()
+	var issueTitle string
+	if m.loaded && len(filtered) > 0 && m.cursor < len(filtered) {
+		issue := filtered[m.cursor]
+		prefix := fmt.Sprintf("#%d  ", issue.Number)
+		if active {
+			issueTitle = titleStyle.Render(prefix + truncate(issue.Title, w-lipgloss.Width(prefix)))
+		} else {
+			issueTitle = dimStyle.Render(prefix + truncate(issue.Title, w-lipgloss.Width(prefix)))
+		}
+	} else {
+		if active {
+			issueTitle = titleStyle.Render("Detail")
+		} else {
+			issueTitle = dimStyle.Render("Detail")
+		}
+	}
+
+	separator := dimStyle.Render(strings.Repeat("─", w))
+	// Match left panel: title, blank, detail label, separator
+	detailLabel := dimStyle.Render("Detail")
+	header := issueTitle + "\n\n" + detailLabel + "\n" + separator + "\n"
+
+	headerH := 4 // title + blank + detail label + separator
+	vpHeight := m.mainH() - 2 - headerH
+	if vpHeight < 1 {
+		vpHeight = 1
+	}
+	m.viewport.Height = vpHeight
+
+	content := header + m.viewport.View()
 	return panelBorder(active).
 		Width(m.detailW()-2).
 		Height(m.mainH()-2).
 		Padding(0, 1).
-		Render(m.viewport.View())
+		Render(content)
 }
 
 func (m model) renderDetailContent() string {
@@ -399,10 +488,6 @@ func (m model) renderDetailContent() string {
 	}
 
 	var b strings.Builder
-
-	prefix := fmt.Sprintf("#%d  ", issue.Number)
-	b.WriteString(titleStyle.Render(prefix + truncate(issue.Title, w-lipgloss.Width(prefix))))
-	b.WriteString("\n\n")
 
 	// Metadata in tree-view style
 	b.WriteString(dimStyle.Render("├── ") + dimStyle.Render("state   ") + stateColor.Render(stateLabel) + "\n")
@@ -447,7 +532,7 @@ func (m model) renderDetailContent() string {
 		case "MERGED":
 			prStatusLabel = prMergedBadge.Render("merged")
 		case "CLOSED":
-			prStatusLabel = prMergedBadge.Render("closed")
+			prStatusLabel = prClosedBadge.Render("closed")
 		default:
 			prStatusLabel = prBadge.Render("open")
 		}
@@ -618,4 +703,34 @@ func (m model) renderStatusBar() string {
 		bar += strings.Repeat(" ", m.width-barW)
 	}
 	return bar
+}
+
+// selectedTitleTruncated checks if the currently selected issue's title is
+// truncated in the list panel. Returns the full title, the row index, and true
+// if truncated.
+func (m model) selectedTitleTruncated() (string, int, bool) {
+	if !m.loaded {
+		return "", 0, false
+	}
+	filtered := m.filteredIssues()
+	if len(filtered) == 0 || m.cursor >= len(filtered) {
+		return "", 0, false
+	}
+
+	issue := filtered[m.cursor]
+	innerW := m.listInnerW()
+
+	const statusColWidth = 12
+	const prColWidth = 12
+	prefixW := 4 + 6 // indicator/space + dot + "#1234 "
+	rightW := statusColWidth + prColWidth
+	titleMaxW := innerW - prefixW - rightW
+	if titleMaxW < 4 {
+		titleMaxW = 4
+	}
+
+	if len([]rune(issue.Title)) > titleMaxW {
+		return issue.Title, m.cursor, true
+	}
+	return "", 0, false
 }
