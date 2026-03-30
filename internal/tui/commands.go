@@ -86,6 +86,12 @@ func deleteIssueCmd(issueNum int) tea.Cmd {
 	}
 }
 
+func mergeIssuesCmd(source, target github.Issue) tea.Cmd {
+	return func() tea.Msg {
+		return issueMergedMsg{github.MergeIssues(source, target)}
+	}
+}
+
 func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
@@ -96,14 +102,34 @@ func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	}
 }
 
-func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions bool, additionalContext bool) tea.Cmd {
+func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions bool, additionalContext bool, planMode bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
 		if err != nil {
 			return claudeTaskCreatedMsg{tmux.ClaudeResult{Err: err, Branch: branch}}
 		}
 		prompt := buildClaudePrompt(issue, additionalContext)
-		return claudeTaskCreatedMsg{tmux.OpenClaude(branch, path, existed, prompt, split, dangerouslySkipPermissions)}
+		return claudeTaskCreatedMsg{tmux.OpenClaude(branch, path, existed, prompt, split, dangerouslySkipPermissions, planMode)}
+	}
+}
+
+func listWorktreesCmd() tea.Cmd {
+	return func() tea.Msg {
+		entries, err := worktree.List()
+		return worktreeListMsg{entries: entries, err: err}
+	}
+}
+
+func removeWorktreesCmd(paths []string) tea.Cmd {
+	return func() tea.Msg {
+		var removed []string
+		for _, p := range paths {
+			if err := worktree.Remove(p); err != nil {
+				return worktreeRemovedMsg{removed: removed, failed: p, err: err}
+			}
+			removed = append(removed, p)
+		}
+		return worktreeRemovedMsg{removed: removed}
 	}
 }
 

@@ -9,6 +9,57 @@ import (
 	"strings"
 )
 
+// WorktreeEntry represents a single git worktree.
+type WorktreeEntry struct {
+	Path   string
+	Branch string
+	Head   string
+	Bare   bool
+}
+
+// List returns all git worktrees by parsing `git worktree list --porcelain`.
+func List() ([]WorktreeEntry, error) {
+	out, err := exec.Command("git", "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		return nil, fmt.Errorf("git worktree list failed: %w", err)
+	}
+
+	var entries []WorktreeEntry
+	var current WorktreeEntry
+	for _, line := range strings.Split(string(out), "\n") {
+		switch {
+		case strings.HasPrefix(line, "worktree "):
+			current = WorktreeEntry{Path: strings.TrimPrefix(line, "worktree ")}
+		case strings.HasPrefix(line, "HEAD "):
+			current.Head = strings.TrimPrefix(line, "HEAD ")
+		case strings.HasPrefix(line, "branch "):
+			ref := strings.TrimPrefix(line, "branch ")
+			current.Branch = strings.TrimPrefix(ref, "refs/heads/")
+		case line == "bare":
+			current.Bare = true
+		case line == "":
+			if current.Path != "" {
+				entries = append(entries, current)
+				current = WorktreeEntry{}
+			}
+		}
+	}
+	return entries, nil
+}
+
+// Remove removes a git worktree by path, using force if necessary.
+func Remove(worktreePath string) error {
+	_, err := exec.Command("git", "worktree", "remove", worktreePath).CombinedOutput()
+	if err != nil {
+		// Try force removal if normal removal fails
+		out, err2 := exec.Command("git", "worktree", "remove", "--force", worktreePath).CombinedOutput()
+		if err2 != nil {
+			return fmt.Errorf("git worktree remove failed: %s", strings.TrimSpace(string(out)))
+		}
+	}
+	return nil
+}
+
 func Slugify(s string) string {
 	s = strings.ToLower(s)
 	re := regexp.MustCompile(`[^a-z0-9]+`)
