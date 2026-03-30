@@ -93,24 +93,46 @@ func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	}
 }
 
-func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions bool) tea.Cmd {
+func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions bool, additionalContext bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
 		if err != nil {
 			return claudeTaskCreatedMsg{tmux.ClaudeResult{Err: err, Branch: branch}}
 		}
-		prompt := buildClaudePrompt(issue)
+		prompt := buildClaudePrompt(issue, additionalContext)
 		return claudeTaskCreatedMsg{tmux.OpenClaude(branch, path, existed, prompt, split, dangerouslySkipPermissions)}
 	}
 }
 
-func buildClaudePrompt(issue github.Issue) string {
+func buildClaudePrompt(issue github.Issue, additionalContext bool) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("GitHub Issue #%d: %s", issue.Number, issue.Title))
+
+	if additionalContext {
+		sb.WriteString(fmt.Sprintf("\nAuthor: %s", issue.Author.Login))
+		sb.WriteString(fmt.Sprintf("\nCreated: %s", issue.CreatedAt))
+		sb.WriteString(fmt.Sprintf("\nState: %s", issue.State))
+		if len(issue.Labels) > 0 {
+			names := make([]string, len(issue.Labels))
+			for i, l := range issue.Labels {
+				names[i] = l.Name
+			}
+			sb.WriteString(fmt.Sprintf("\nLabels: %s", strings.Join(names, ", ")))
+		}
+	}
+
 	if issue.Body != "" {
 		sb.WriteString("\n\n")
 		sb.WriteString(issue.Body)
 	}
+
+	if additionalContext && len(issue.Comments) > 0 {
+		sb.WriteString("\n\n--- Comments ---")
+		for _, c := range issue.Comments {
+			sb.WriteString(fmt.Sprintf("\n\n%s (%s):\n%s", c.Author.Login, c.CreatedAt, c.Body))
+		}
+	}
+
 	sb.WriteString("\n\nPlease work on this issue.")
 	return sb.String()
 }

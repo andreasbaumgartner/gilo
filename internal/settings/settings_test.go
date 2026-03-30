@@ -86,6 +86,26 @@ func TestSaveWritesValidJSON(t *testing.T) {
 	}
 }
 
+func TestAdditionalContextSaveAndLoad(t *testing.T) {
+	origHome := os.Getenv("HOME")
+	tmpHome := t.TempDir()
+	os.Setenv("HOME", tmpHome)
+	defer os.Setenv("HOME", origHome)
+
+	want := Settings{
+		AdditionalContext: true,
+	}
+
+	if err := Save(want); err != nil {
+		t.Fatalf("Save() error: %v", err)
+	}
+
+	got := Load()
+	if got.AdditionalContext != true {
+		t.Error("expected AdditionalContext to be true after save and load")
+	}
+}
+
 func TestLoadWithCorruptFile(t *testing.T) {
 	origHome := os.Getenv("HOME")
 	tmpHome := t.TempDir()

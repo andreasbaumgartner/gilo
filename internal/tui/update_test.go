@@ -9,6 +9,39 @@ import (
 	"github.com/andreasbaumgartner/gilo/internal/tmux"
 )
 
+func TestAdditionalContextToggle(t *testing.T) {
+	t.Run("i toggles additional context on", func(t *testing.T) {
+		m := model{
+			width:  100,
+			height: 50,
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}}
+		result, _ := m.updateNormal(msg)
+		rm := result.(model)
+
+		if !rm.settings.AdditionalContext {
+			t.Error("expected AdditionalContext to be true after toggle")
+		}
+	})
+
+	t.Run("i toggles additional context off", func(t *testing.T) {
+		m := model{
+			width:  100,
+			height: 50,
+		}
+		m.settings.AdditionalContext = true
+
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'i'}}
+		result, _ := m.updateNormal(msg)
+		rm := result.(model)
+
+		if rm.settings.AdditionalContext {
+			t.Error("expected AdditionalContext to be false after toggle")
+		}
+	})
+}
+
 func TestKillWindowKeybind(t *testing.T) {
 	t.Run("K opens confirmation when tmux pane exists", func(t *testing.T) {
 		m := model{
