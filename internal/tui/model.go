@@ -60,6 +60,10 @@ type tmuxWindowKilledMsg struct {
 type tmuxStatusMsg []tmux.Pane
 type tmuxTickMsg struct{}
 type refreshTickMsg struct{}
+type linkedPRsMsg struct {
+	prs map[int]github.PR
+	err error
+}
 
 // Focus
 
@@ -119,6 +123,7 @@ type model struct {
 	labelCursor   int
 
 	tmuxPanes []tmux.Pane
+	linkedPRs map[int]github.PR
 
 	refreshing bool
 

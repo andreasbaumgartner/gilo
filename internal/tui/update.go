@@ -60,6 +60,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.clampListOffset()
 		m.updateViewport()
+		return m, fetchLinkedPRsCmd(m.settings.GetIssuesMax())
+
+	case linkedPRsMsg:
+		if msg.err == nil {
+			m.linkedPRs = msg.prs
+			m.updateViewport()
+		}
 
 	case errMsg:
 		m.err = msg.err

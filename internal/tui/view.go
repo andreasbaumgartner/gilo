@@ -302,6 +302,18 @@ func (m model) renderList() string {
 					break
 				}
 			}
+			if statusBadge == "" {
+				if pr, ok := m.linkedPRs[issue.Number]; ok {
+					switch pr.State {
+					case "MERGED":
+						statusBadge = prMergedBadge.Render("merged")
+					case "CLOSED":
+						statusBadge = prMergedBadge.Render("PR closed")
+					default:
+						statusBadge = prBadge.Render("PR")
+					}
+				}
+			}
 
 			// Fixed-width columns for consistent alignment
 			const statusColWidth = 12
@@ -393,8 +405,10 @@ func (m model) renderDetailContent() string {
 			break
 		}
 	}
+	_, hasPR := m.linkedPRs[issue.Number]
 
-	if hasLabels || hasTmux {
+	hasMore := hasLabels || hasTmux || hasPR
+	if hasMore {
 		b.WriteString(dimStyle.Render("├── ") + dimStyle.Render("created ") + issue.CreatedAt[:10] + "\n")
 	} else {
 		b.WriteString(dimStyle.Render("└── ") + dimStyle.Render("created ") + issue.CreatedAt[:10] + "\n")
@@ -406,10 +420,27 @@ func (m model) renderDetailContent() string {
 			names[i] = l.Name
 		}
 		connector := "├── "
-		if !hasTmux {
+		if !hasTmux && !hasPR {
 			connector = "└── "
 		}
 		b.WriteString(dimStyle.Render(connector) + dimStyle.Render("labels  ") + yellowStyle.Render(strings.Join(names, ", ")) + "\n")
+	}
+
+	if pr, ok := m.linkedPRs[issue.Number]; ok {
+		connector := "├── "
+		if !hasTmux {
+			connector = "└── "
+		}
+		var prStatusLabel string
+		switch pr.State {
+		case "MERGED":
+			prStatusLabel = prMergedBadge.Render("merged")
+		case "CLOSED":
+			prStatusLabel = prMergedBadge.Render("closed")
+		default:
+			prStatusLabel = prBadge.Render("open")
+		}
+		b.WriteString(dimStyle.Render(connector) + dimStyle.Render("PR      ") + prStatusLabel + " " + dimStyle.Render(fmt.Sprintf("#%d %s", pr.Number, pr.Title)) + "\n")
 	}
 
 	for _, p := range m.tmuxPanes {

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -31,6 +33,57 @@ type Issue struct {
 		Body      string `json:"body"`
 		CreatedAt string `json:"createdAt"`
 	} `json:"comments"`
+}
+
+type PR struct {
+	Number      int    `json:"number"`
+	Title       string `json:"title"`
+	State       string `json:"state"`       // "OPEN", "CLOSED", "MERGED"
+	HeadRefName string `json:"headRefName"` // branch name
+	Body        string `json:"body"`
+}
+
+// LinkedPRs maps issue numbers to PRs that reference them.
+func FetchLinkedPRs(limit int) (map[int]PR, error) {
+	out, err := exec.Command("gh", "pr", "list",
+		"--state", "all",
+		"--json", "number,title,state,headRefName,body",
+		"--limit", fmt.Sprintf("%d", limit)).Output()
+	if err != nil {
+		return nil, err
+	}
+	var prs []PR
+	if err := json.Unmarshal(out, &prs); err != nil {
+		return nil, err
+	}
+
+	return matchPRsToIssues(prs), nil
+}
+
+func matchPRsToIssues(prs []PR) map[int]PR {
+	branchRe := regexp.MustCompile(`^issue-(\d+)-`)
+	bodyRe := regexp.MustCompile(`(?i)(?:closes|close|resolves|resolve|fixes|fix|resolved)\s+#(\d+)`)
+	linked := make(map[int]PR)
+
+	for _, pr := range prs {
+		// Match by branch name pattern (issue-{number}-*)
+		if m := branchRe.FindStringSubmatch(pr.HeadRefName); m != nil {
+			if num, err := strconv.Atoi(m[1]); err == nil {
+				if existing, exists := linked[num]; !exists || pr.State == "OPEN" && existing.State != "OPEN" {
+					linked[num] = pr
+				}
+			}
+		}
+		// Match by body references (closes #N, resolves #N, fixes #N)
+		for _, m := range bodyRe.FindAllStringSubmatch(pr.Body, -1) {
+			if num, err := strconv.Atoi(m[1]); err == nil {
+				if existing, exists := linked[num]; !exists || pr.State == "OPEN" && existing.State != "OPEN" {
+					linked[num] = pr
+				}
+			}
+		}
+	}
+	return linked
 }
 
 func FetchIssues(limit int) ([]Issue, error) {
