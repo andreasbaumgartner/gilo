@@ -54,6 +54,16 @@ A Terminal User Interface (TUI) for managing GitHub issues and AI agents, writte
 
 ## Installation
 
+### Install with the setup script
+
+The quickest way to install gilo (no Go required):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/andreasbaumgartner/gilo/main/install.sh | sh
+```
+
+This downloads the latest pre-built binary for your platform and installs it to `/usr/local/bin`. Supports Linux and macOS on both amd64 and arm64.
+
 ### Install with `go install`
 
 The easiest way to install gilo on Linux (or any platform with Go):
