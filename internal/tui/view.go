@@ -382,7 +382,8 @@ func (m model) renderDetailContent() string {
 
 	var b strings.Builder
 
-	b.WriteString(titleStyle.Render(fmt.Sprintf("#%d  %s", issue.Number, issue.Title)))
+	prefix := fmt.Sprintf("#%d  ", issue.Number)
+	b.WriteString(titleStyle.Render(prefix + truncate(issue.Title, w-lipgloss.Width(prefix))))
 	b.WriteString("\n\n")
 
 	// Metadata in tree-view style
