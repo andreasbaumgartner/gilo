@@ -166,41 +166,35 @@ func (m model) renderModal() string {
 		}
 		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
 	case modalHelp:
-		title := titleStyle.Render("Keybindings")
+		title := titleStyle.Render("keybindings")
 		sections := []string{
 			title, "",
-			dimStyle.Render("── Navigation ──"),
-			"  ↑/k       Move up",
-			"  ↓/j       Move down",
-			"  tab       Switch panel",
-			"  f         Cycle filter (Open/Closed/All)",
-			"  a         Cycle sort column",
-			"  A         Toggle sort direction",
+			dimStyle.Render("── navigation ──"),
+			"  " + greenStyle.Render("↑/k") + "       move up",
+			"  " + greenStyle.Render("↓/j") + "       move down",
+			"  " + greenStyle.Render("tab") + "       switch panel",
+			"  " + greenStyle.Render("f") + "         cycle filter",
+			"  " + greenStyle.Render("a") + "         cycle sort column",
+			"  " + greenStyle.Render("A") + "         toggle sort direction",
 			"",
-			dimStyle.Render("── Actions ──"),
-			"  enter     Jump to tmux window / open in browser",
-			"  o         Open issue in browser",
-			"  c         Comment on issue",
-			"  n         Create new issue",
-			"  x         Close/reopen issue",
-			"  d         Delete issue",
-			"  l         Manage labels",
+			dimStyle.Render("── actions ──"),
+			"  " + greenStyle.Render("enter") + "     jump / open",
+			"  " + greenStyle.Render("o") + "         open in browser",
+			"  " + greenStyle.Render("c") + "         comment",
+			"  " + greenStyle.Render("n") + "         new issue",
+			"  " + greenStyle.Render("x") + "         close/reopen",
+			"  " + greenStyle.Render("d") + "         delete",
+			"  " + greenStyle.Render("l") + "         labels",
 			"",
-			dimStyle.Render("── Worktree & Claude ──"),
-			"  w         Worktree in new tmux window",
-			"  W         Worktree in tmux split",
-			"  s         Claude session in new window",
-			"  S         Claude session in split",
+			dimStyle.Render("── worktree & claude ──"),
+			"  " + greenStyle.Render("w/W") + "       worktree / split",
+			"  " + greenStyle.Render("s/S") + "       claude / split",
 			"",
-			dimStyle.Render("── Settings ──"),
-			"  p         Toggle skip-permissions",
-			"  r         Toggle allow-root",
-			"  t         Cycle color scheme",
-			"  m         Cycle issues max (25/50/100/200)",
-			"",
-			dimStyle.Render("── General ──"),
-			"  ?         Show this help",
-			"  q         Quit",
+			dimStyle.Render("── settings ──"),
+			"  " + greenStyle.Render("p") + "         permissions",
+			"  " + greenStyle.Render("r") + "         allow-root",
+			"  " + greenStyle.Render("t") + "         color scheme",
+			"  " + greenStyle.Render("m") + "         cycle issues max",
 			"",
 			dimStyle.Render("esc/?  close"),
 		}
@@ -234,18 +228,20 @@ func (m model) renderList() string {
 	}
 	sortLabel := dimStyle.Render("[" + sortColumnNames[m.sortCol] + sortDir + "]")
 
-	header := titleStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]") + " " + sortLabel + refreshIndicator
+	filtered := m.filteredIssues()
+	count := len(filtered)
+
+	header := titleStyle.Render("Issues") + " " + dimStyle.Render(fmt.Sprintf("(%d)", count)) + " " + dimStyle.Render(filterLabel) + " " + sortLabel + refreshIndicator
 	if !active {
-		header = dimStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]") + " " + sortLabel + refreshIndicator
+		header = dimStyle.Render("Issues") + " " + dimStyle.Render(fmt.Sprintf("(%d)", count)) + " " + dimStyle.Render(filterLabel) + " " + sortLabel + refreshIndicator
 	}
 
 	var rows []string
 	rows = append(rows, header, "")
 
-	filtered := m.filteredIssues()
 	if !m.loaded {
 		rows = append(rows, "  "+dimStyle.Render("Loading..."))
-	} else if len(filtered) == 0 {
+	} else if count == 0 {
 		rows = append(rows, "  "+dimStyle.Render("No "+strings.ToLower(filterLabel)+" issues found."))
 	} else {
 		visibleRows := innerH - len(rows)
@@ -268,16 +264,16 @@ func (m model) renderList() string {
 		}
 
 		if start > 0 {
-			rows = append(rows, dimStyle.Render(fmt.Sprintf("  ↑ %d more issue(s)", start)))
+			rows = append(rows, dimStyle.Render(fmt.Sprintf("  ↑ %d more", start)))
 		}
 
 		for idx := start; idx < end; idx++ {
 			i := idx
 			issue := filtered[idx]
 
-			stateBadge := openBadge.Render("OPEN")
+			stateBadge := openBadge.Render("open")
 			if issue.State == "CLOSED" {
-				stateBadge = closedBadge.Render("CLOSED")
+				stateBadge = closedBadge.Render("closed")
 			}
 
 			statusBadge := ""
@@ -285,46 +281,51 @@ func (m model) renderList() string {
 				if p.IssueNum == issue.Number {
 					switch p.Status {
 					case tmux.StatusReview:
-						statusBadge = reviewBadge.Render("REVIEW")
+						statusBadge = reviewBadge.Render("idle")
 					case tmux.StatusQuestion:
-						statusBadge = questionBadge.Render("QUESTION")
+						statusBadge = questionBadge.Render("thinking")
 					default:
-						statusBadge = workingBadge.Render("WORKING")
+						statusBadge = workingBadge.Render("running")
 					}
 					break
 				}
 			}
 
 			// Fixed-width columns for consistent alignment
-			// " " + longest badge " QUESTION " (10 visual chars) = 11; pad to 12
 			const statusColWidth = 12
 			statusCol := padRight(" "+statusBadge, statusColWidth)
 
 			pad := ""
 			if issue.State != "CLOSED" {
-				pad = "  "
+				pad = " "
 			}
 
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
 			title := truncate(issue.Title, innerW-15-statusColWidth)
-			line := stateBadge + pad + statusCol + " " + num + " " + title
 
 			if i == m.cursor {
 				if active {
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-15-statusColWidth))
-					line = stateBadge + pad + statusCol + " " + selectedStyle.Render(padRight(rest, innerW-9-statusColWidth))
+					// Selected: green left accent + arrow indicator
+					indicator := greenStyle.Render("▶ ")
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-18-statusColWidth))
+					line := indicator + stateBadge + pad + statusCol + " " + selectedStyle.Render(rest)
+					rows = append(rows, line)
 				} else {
+					line := "  " + stateBadge + pad + statusCol + " " + num + " " + title
 					line = lipgloss.NewStyle().
 						Foreground(activeScheme.UnfocusedSelected).
 						Render(line)
+					rows = append(rows, line)
 				}
+			} else {
+				line := "  " + stateBadge + pad + statusCol + " " + num + " " + title
+				rows = append(rows, line)
 			}
-			rows = append(rows, line)
 		}
 
 		if end < len(filtered) {
 			remaining := len(filtered) - end
-			rows = append(rows, dimStyle.Render(fmt.Sprintf("  ↓ %d more issue(s)", remaining)))
+			rows = append(rows, dimStyle.Render(fmt.Sprintf("  ↓ %d more", remaining)))
 		}
 	}
 
@@ -357,53 +358,69 @@ func (m model) renderDetailContent() string {
 	w := m.detailInnerW()
 
 	stateColor := greenStyle
+	stateLabel := "open"
 	if issue.State == "CLOSED" {
 		stateColor = redStyle
+		stateLabel = "closed"
 	}
 
 	var b strings.Builder
 
 	b.WriteString(titleStyle.Render(fmt.Sprintf("#%d  %s", issue.Number, issue.Title)))
-	b.WriteString("\n")
-	b.WriteString(strings.Repeat("─", min(w, 60)))
 	b.WriteString("\n\n")
 
-	b.WriteString(dimStyle.Render("State:   ") + stateColor.Render(issue.State) + "\n")
-	b.WriteString(dimStyle.Render("Author:  ") + issue.Author.Login + "\n")
-	b.WriteString(dimStyle.Render("Created: ") + issue.CreatedAt[:10] + "\n")
+	// Metadata in tree-view style
+	b.WriteString(dimStyle.Render("├── ") + dimStyle.Render("state   ") + stateColor.Render(stateLabel) + "\n")
+	b.WriteString(dimStyle.Render("├── ") + dimStyle.Render("author  ") + issue.Author.Login + "\n")
 
-	if len(issue.Labels) > 0 {
+	hasLabels := len(issue.Labels) > 0
+	hasTmux := false
+	for _, p := range m.tmuxPanes {
+		if p.IssueNum == issue.Number {
+			hasTmux = true
+			break
+		}
+	}
+
+	if hasLabels || hasTmux {
+		b.WriteString(dimStyle.Render("├── ") + dimStyle.Render("created ") + issue.CreatedAt[:10] + "\n")
+	} else {
+		b.WriteString(dimStyle.Render("└── ") + dimStyle.Render("created ") + issue.CreatedAt[:10] + "\n")
+	}
+
+	if hasLabels {
 		names := make([]string, len(issue.Labels))
 		for i, l := range issue.Labels {
 			names[i] = l.Name
 		}
-		b.WriteString(dimStyle.Render("Labels:  ") + yellowStyle.Render(strings.Join(names, ", ")) + "\n")
+		connector := "├── "
+		if !hasTmux {
+			connector = "└── "
+		}
+		b.WriteString(dimStyle.Render(connector) + dimStyle.Render("labels  ") + yellowStyle.Render(strings.Join(names, ", ")) + "\n")
 	}
 
 	for _, p := range m.tmuxPanes {
 		if p.IssueNum == issue.Number {
-			b.WriteString("\n")
-			b.WriteString(dimStyle.Render("── Tmux ") + dimStyle.Render(strings.Repeat("─", max(0, w-10))) + "\n\n")
 			var statusLabel string
 			switch p.Status {
 			case tmux.StatusReview:
-				statusLabel = reviewBadge.Render("REVIEW")
+				statusLabel = reviewBadge.Render("idle")
 			case tmux.StatusQuestion:
-				statusLabel = questionBadge.Render("QUESTION")
+				statusLabel = questionBadge.Render("thinking")
 			default:
-				statusLabel = workingBadge.Render("WORKING")
+				statusLabel = workingBadge.Render("running")
 			}
-			b.WriteString("  " + yellowStyle.Render("Status: ") + statusLabel + "\n")
-			b.WriteString("  " + yellowStyle.Render("Window: ") + p.WindowName + "\n")
+			b.WriteString(dimStyle.Render("└── ") + dimStyle.Render("tmux    ") + statusLabel + " " + dimStyle.Render(p.WindowName) + "\n")
 			if p.LastLine != "" {
-				b.WriteString("  " + yellowStyle.Render("Output: ") + truncate(p.LastLine, w-12) + "\n")
+				b.WriteString(dimStyle.Render("         ") + dimStyle.Render(truncate(p.LastLine, w-12)) + "\n")
 			}
 			break
 		}
 	}
 
 	b.WriteString("\n")
-	b.WriteString(dimStyle.Render("── Description ") + dimStyle.Render(strings.Repeat("─", max(0, w-17))) + "\n\n")
+	b.WriteString(dimStyle.Render("── description ") + dimStyle.Render(strings.Repeat("─", max(0, w-17))) + "\n\n")
 	if issue.Body == "" {
 		b.WriteString(dimStyle.Render("  (no description)\n"))
 	} else {
@@ -414,12 +431,12 @@ func (m model) renderDetailContent() string {
 
 	if len(issue.Comments) > 0 {
 		b.WriteString("\n")
-		b.WriteString(dimStyle.Render(fmt.Sprintf("── Comments (%d) ", len(issue.Comments))) +
+		b.WriteString(dimStyle.Render(fmt.Sprintf("── comments (%d) ", len(issue.Comments))) +
 			dimStyle.Render(strings.Repeat("─", max(0, w-20))) + "\n")
 
 		for _, c := range issue.Comments {
 			b.WriteString("\n")
-			b.WriteString(lipgloss.NewStyle().Bold(true).Render(c.Author.Login))
+			b.WriteString(lipgloss.NewStyle().Bold(true).Foreground(colorActive).Render(c.Author.Login))
 			b.WriteString("  " + dimStyle.Render(c.CreatedAt[:10]) + "\n")
 			for _, line := range strings.Split(c.Body, "\n") {
 				b.WriteString("  " + line + "\n")
@@ -454,30 +471,57 @@ func (m model) renderStatusBar() string {
 		}
 		keys = []string{
 			"↑↓/jk navigate",
-			"tab switch panel",
-			"f filter state",
+			"tab panel",
+			"f filter",
 			"a/A sort",
 			"g refresh",
-			"enter jump/open",
+			"enter jump",
 			"o browser",
 			"c comment",
-			"w/W worktree/split",
-			"s/S claude/split",
+			"w worktree",
+			"s claude",
 			permLabel,
 			fmt.Sprintf("m max:%d", m.settings.GetIssuesMax()),
-			"t theme:" + activeScheme.Name,
+			"t " + activeScheme.Name,
 			"l labels",
-			"x close/reopen",
-			"d delete",
-			"n new issue",
+			"x close",
+			"n new",
 			"? help",
 			"q quit",
 		}
 	}
+
+	// Build tmux session tabs with colored dots
+	var tmuxTabs string
+	tmuxTabsW := 0
 	if m.modal == modalNone && len(m.tmuxPanes) > 0 {
-		keys = append([]string{fmt.Sprintf("%d tmux ⟳", len(m.tmuxPanes))}, keys...)
+		var tabs []string
+		for _, p := range m.tmuxPanes {
+			var dot string
+			switch p.Status {
+			case tmux.StatusReview:
+				dot = dotIdle.Render("●")
+			case tmux.StatusQuestion:
+				dot = dotThinking.Render("●")
+			default:
+				dot = dotRunning.Render("●")
+			}
+			name := p.WindowName
+			if len(name) > 16 {
+				name = name[:16]
+			}
+			tabs = append(tabs, dot+" "+dimStyle.Render(name))
+		}
+		tmuxTabs = strings.Join(tabs, "  ")
+		tmuxTabsW = lipgloss.Width(tmuxTabs) + 2 // add separator space
 	}
-	// Build bar, truncating keys that don't fit the terminal width
+
+	// Build keybind bar, truncating keys that don't fit
+	availW := m.width
+	if tmuxTabsW > 0 {
+		availW -= tmuxTabsW
+	}
+
 	var bar string
 	barW := 0
 	for i, k := range keys {
@@ -489,13 +533,20 @@ func (m model) renderStatusBar() string {
 			sep = " "
 			sepW = 1
 		}
-		if barW+sepW+partW > m.width {
+		if barW+sepW+partW > availW {
 			break
 		}
 		bar += sep + part
 		barW += sepW + partW
 	}
-	if barW < m.width {
+
+	if tmuxTabsW > 0 {
+		gap := m.width - barW - tmuxTabsW
+		if gap < 1 {
+			gap = 1
+		}
+		bar = bar + strings.Repeat(" ", gap) + tmuxTabs
+	} else if barW < m.width {
 		bar += strings.Repeat(" ", m.width-barW)
 	}
 	return bar

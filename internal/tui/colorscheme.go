@@ -31,6 +31,13 @@ type ColorScheme struct {
 
 	OverlayBg         lipgloss.Color
 	UnfocusedSelected lipgloss.Color
+
+	// Accent color for selected item left-border
+	AccentBorder lipgloss.Color
+	// Dot indicator colors for status in tab bar
+	DotRunning  lipgloss.Color
+	DotThinking lipgloss.Color
+	DotIdle     lipgloss.Color
 }
 
 var colorSchemes = map[string]ColorScheme{
@@ -41,35 +48,40 @@ var colorSchemes = map[string]ColorScheme{
 
 var colorSchemeOrder = []string{"default", "catppuccin", "kanagawa"}
 
-// Default: Lazygit-inspired clean white theme
+// Default: Modern dark theme with green accent (inspired by screenshot)
 var schemeDefault = ColorScheme{
 	Name: "default",
 
-	Active:   lipgloss.Color("62"),
-	Inactive: lipgloss.Color("240"),
-	Dim:      lipgloss.Color("240"),
-	Yellow:   lipgloss.Color("3"),
-	Green:    lipgloss.Color("2"),
-	Red:      lipgloss.Color("1"),
+	Active:   lipgloss.Color("#50fa7b"),
+	Inactive: lipgloss.Color("#44475a"),
+	Dim:      lipgloss.Color("#6272a4"),
+	Yellow:   lipgloss.Color("#f1fa8c"),
+	Green:    lipgloss.Color("#50fa7b"),
+	Red:      lipgloss.Color("#ff5555"),
 
-	SelectedFg: lipgloss.Color("15"),
+	SelectedFg: lipgloss.Color("#282a36"),
 
-	OpenBadgeBg:    lipgloss.Color("22"),
-	OpenBadgeFg:    lipgloss.Color("10"),
-	ClosedBadgeBg:  lipgloss.Color("52"),
-	ClosedBadgeFg:  lipgloss.Color("9"),
-	WorkingBadgeBg: lipgloss.Color("58"),
-	WorkingBadgeFg: lipgloss.Color("11"),
-	ReviewBadgeBg:   lipgloss.Color("23"),
-	ReviewBadgeFg:   lipgloss.Color("14"),
-	QuestionBadgeBg: lipgloss.Color("53"),
-	QuestionBadgeFg: lipgloss.Color("13"),
+	OpenBadgeBg:    lipgloss.Color("#1a3a1a"),
+	OpenBadgeFg:    lipgloss.Color("#50fa7b"),
+	ClosedBadgeBg:  lipgloss.Color("#3a1a1a"),
+	ClosedBadgeFg:  lipgloss.Color("#ff5555"),
+	WorkingBadgeBg: lipgloss.Color("#1a3a1a"),
+	WorkingBadgeFg: lipgloss.Color("#50fa7b"),
+	ReviewBadgeBg:   lipgloss.Color("#2a2a3a"),
+	ReviewBadgeFg:   lipgloss.Color("#6272a4"),
+	QuestionBadgeBg: lipgloss.Color("#3a3a1a"),
+	QuestionBadgeFg: lipgloss.Color("#f1fa8c"),
 
-	KeybindBg: lipgloss.Color("236"),
-	KeybindFg: lipgloss.Color("252"),
+	KeybindBg: lipgloss.Color("#282a36"),
+	KeybindFg: lipgloss.Color("#f8f8f2"),
 
-	OverlayBg:         lipgloss.Color("0"),
-	UnfocusedSelected: lipgloss.Color("252"),
+	OverlayBg:         lipgloss.Color("#1e1f29"),
+	UnfocusedSelected: lipgloss.Color("#f8f8f2"),
+
+	AccentBorder: lipgloss.Color("#50fa7b"),
+	DotRunning:   lipgloss.Color("#50fa7b"),
+	DotThinking:  lipgloss.Color("#f1fa8c"),
+	DotIdle:      lipgloss.Color("#6272a4"),
 }
 
 // Catppuccin Mocha
@@ -101,6 +113,11 @@ var schemeCatppuccin = ColorScheme{
 
 	OverlayBg:         lipgloss.Color("#11111b"), // Crust
 	UnfocusedSelected: lipgloss.Color("#a6adc8"), // Subtext0
+
+	AccentBorder: lipgloss.Color("#89b4fa"),
+	DotRunning:   lipgloss.Color("#a6e3a1"),
+	DotThinking:  lipgloss.Color("#f9e2af"),
+	DotIdle:      lipgloss.Color("#6c7086"),
 }
 
 // Kanagawa (inspired by the famous Neovim theme)
@@ -132,4 +149,9 @@ var schemeKanagawa = ColorScheme{
 
 	OverlayBg:         lipgloss.Color("#16161d"), // Sumi ink 0
 	UnfocusedSelected: lipgloss.Color("#c8c093"), // Old white
+
+	AccentBorder: lipgloss.Color("#7e9cd8"),
+	DotRunning:   lipgloss.Color("#98bb6c"),
+	DotThinking:  lipgloss.Color("#e6c384"),
+	DotIdle:      lipgloss.Color("#727169"),
 }
