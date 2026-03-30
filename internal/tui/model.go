@@ -39,6 +39,10 @@ type tmuxJumpMsg struct {
 	windowName string
 	ok         bool
 }
+type tmuxWindowKilledMsg struct {
+	windowName string
+	ok         bool
+}
 type tmuxStatusMsg []tmux.Pane
 type tmuxTickMsg struct{}
 type refreshTickMsg struct{}
@@ -67,6 +71,7 @@ const (
 	modalDeleteConfirm
 	modalCloseConfirm
 	modalPermissionWarning
+	modalKillWindowConfirm
 	modalHelp
 )
 
@@ -87,8 +92,9 @@ type model struct {
 	modal            modalKind
 	modalIssue       int
 	modalStatus      string
-	modalCloseAction string // "close" or "reopen"
-	textarea    textarea.Model
+	modalCloseAction    string // "close" or "reopen"
+	modalKillWindowName string // tmux window name to kill
+	textarea            textarea.Model
 
 	textareaBody textarea.Model
 	createFocus  int

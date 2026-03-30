@@ -165,6 +165,17 @@ func (m model) renderModal() string {
 			body = strings.Join(rows, "\n")
 		}
 		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+	case modalKillWindowConfirm:
+		title := titleStyle.Render(fmt.Sprintf("Close Tmux Window for #%d", m.modalIssue))
+		var body string
+		if m.modalStatus != "" {
+			body = m.modalStatus
+		} else {
+			body = fmt.Sprintf("Are you sure you want to close the tmux window\n\"%s\"?", m.modalKillWindowName)
+		}
+		hint := dimStyle.Render("y confirm  │  n/esc cancel")
+		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
 	case modalHelp:
 		title := titleStyle.Render("Keybindings")
 		sections := []string{
@@ -189,6 +200,7 @@ func (m model) renderModal() string {
 			"  W         Worktree in tmux split",
 			"  s         Claude session in new window",
 			"  S         Claude session in split",
+			"  K         Close tmux window",
 			"",
 			dimStyle.Render("── Settings ──"),
 			"  p         Toggle skip-permissions",
@@ -432,7 +444,7 @@ func (m model) renderStatusBar() string {
 		keys = []string{"j/k navigate", "space toggle", "ctrl+d submit", "esc cancel"}
 	case modalHelp:
 		keys = []string{"esc/? close"}
-	case modalDeleteConfirm, modalCloseConfirm:
+	case modalDeleteConfirm, modalCloseConfirm, modalKillWindowConfirm:
 		keys = []string{"y confirm", "n/esc cancel"}
 	case modalBrowser, modalWorktree, modalClaudeTask:
 		keys = []string{"esc dismiss"}
@@ -453,6 +465,7 @@ func (m model) renderStatusBar() string {
 			"c comment",
 			"w/W worktree/split",
 			"s/S claude/split",
+			"K close window",
 			permLabel,
 			"t theme:" + activeScheme.Name,
 			"l labels",

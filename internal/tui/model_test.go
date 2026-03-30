@@ -104,7 +104,7 @@ func TestModalKindConstants(t *testing.T) {
 	kinds := []modalKind{
 		modalNone, modalBrowser, modalComment, modalWorktree,
 		modalCreate, modalLabel, modalClaudeTask, modalDeleteConfirm,
-		modalPermissionWarning, modalHelp,
+		modalCloseConfirm, modalPermissionWarning, modalKillWindowConfirm, modalHelp,
 	}
 	seen := make(map[modalKind]bool)
 	for _, k := range kinds {
