@@ -71,6 +71,9 @@ func (m model) renderModal() string {
 		if m.settings.DangerouslySkipPermissions {
 			content += "\n\n" + lipgloss.NewStyle().Foreground(colorYellow).Render("⚡ Running with --dangerously-skip-permissions")
 		}
+		if m.settings.AdditionalContext {
+			content += "\n" + lipgloss.NewStyle().Foreground(colorActive).Render("📋 Sending with additional context (labels, comments, metadata)")
+		}
 		return modalStyle.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
 
 	case modalPermissionWarning:
@@ -204,6 +207,7 @@ func (m model) renderModal() string {
 			"",
 			dimStyle.Render("── settings ──"),
 			"  " + greenStyle.Render("p") + "         permissions",
+			"  " + greenStyle.Render("i") + "         additional context",
 			"  " + greenStyle.Render("r") + "         allow-root",
 			"  " + greenStyle.Render("t") + "         color scheme",
 			"  " + greenStyle.Render("m") + "         cycle issues max",
@@ -481,6 +485,10 @@ func (m model) renderStatusBar() string {
 		if m.settings.DangerouslySkipPermissions {
 			permLabel = "p permissions:ON"
 		}
+		ctxLabel := "i context:off"
+		if m.settings.AdditionalContext {
+			ctxLabel = "i context:ON"
+		}
 		keys = []string{
 			"↑↓/jk navigate",
 			"tab panel",
@@ -494,6 +502,7 @@ func (m model) renderStatusBar() string {
 			"s/S claude/split",
 			"K close window",
 			permLabel,
+			ctxLabel,
 			fmt.Sprintf("m max:%d", m.settings.GetIssuesMax()),
 			"t " + activeScheme.Name,
 			"l labels",
