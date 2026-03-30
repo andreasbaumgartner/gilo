@@ -188,6 +188,34 @@ func (m model) renderModal() string {
 			body = strings.Join(rows, "\n")
 		}
 		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+	case modalWorktreeCleanup:
+		title := titleStyle.Render("Cleanup Worktrees")
+		hint := dimStyle.Render("j/k navigate  │  space select  │  ctrl+d remove  │  esc cancel")
+		var body string
+		if m.modalStatus != "" && len(m.worktreeEntries) == 0 {
+			body = m.modalStatus
+		} else if len(m.worktreeEntries) == 0 {
+			body = dimStyle.Render("No issue worktrees found.")
+		} else {
+			var rows []string
+			if m.modalStatus != "" {
+				rows = append(rows, m.modalStatus, "")
+			}
+			for i, e := range m.worktreeEntries {
+				check := "[ ]"
+				if m.worktreeSelected[i] {
+					check = "[x]"
+				}
+				line := fmt.Sprintf(" %s %s", check, e.Branch)
+				if i == m.worktreeCursor {
+					line = selectedStyle.Render(fmt.Sprintf(" %s %s", check, e.Branch))
+				}
+				rows = append(rows, line)
+			}
+			body = strings.Join(rows, "\n")
+		}
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
 	case modalMerge:
 		title := titleStyle.Render(fmt.Sprintf("Merge #%d into...", m.modalIssue))
 		hint := dimStyle.Render("j/k navigate  │  enter select  │  esc cancel")
@@ -225,6 +253,7 @@ func (m model) renderModal() string {
 		}
 		hint := dimStyle.Render("y confirm  │  n/esc cancel")
 		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
 
 	case modalKillWindowConfirm:
 		title := titleStyle.Render(fmt.Sprintf("Close Tmux Window for #%d", m.modalIssue))
@@ -264,6 +293,7 @@ func (m model) renderModal() string {
 			dimStyle.Render("── worktree & claude ──"),
 			"  " + greenStyle.Render("w/W") + "       worktree / split",
 			"  " + greenStyle.Render("s/S") + "       claude / split",
+			"  " + greenStyle.Render("C") + "         cleanup worktrees",
 			"  " + greenStyle.Render("K") + "         close tmux window",
 			"",
 			dimStyle.Render("── settings ──"),
@@ -646,6 +676,8 @@ func (m model) renderStatusBar() string {
 		keys = []string{"y confirm", "n/esc cancel"}
 	case modalDeleteConfirm, modalCloseConfirm, modalKillWindowConfirm:
 		keys = []string{"y confirm", "n/esc cancel"}
+	case modalWorktreeCleanup:
+		keys = []string{"j/k navigate", "space select", "ctrl+d remove", "esc cancel"}
 	case modalBrowser, modalWorktree, modalClaudeTask:
 		keys = []string{"esc dismiss"}
 	case modalPermissionWarning:
@@ -682,6 +714,7 @@ func (m model) renderStatusBar() string {
 			"c comment",
 			"w/W worktree/split",
 			"s/S claude/split",
+			"C cleanup",
 			"K close window",
 			permLabel,
 			ctxLabel,

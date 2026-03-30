@@ -36,6 +36,30 @@ func TestSlugify(t *testing.T) {
 	}
 }
 
+func TestList(t *testing.T) {
+	// List requires a git repo, so we only test that it doesn't panic
+	// and returns a reasonable result when run from a git repo.
+	entries, err := List()
+	if err != nil {
+		t.Skipf("Skipping List test (not in a git repo or git not available): %v", err)
+	}
+	// Should have at least one entry (the main worktree)
+	if len(entries) == 0 {
+		t.Error("List returned no entries; expected at least the main worktree")
+	}
+	// First entry should have a non-empty path
+	if entries[0].Path == "" {
+		t.Error("First worktree entry has empty path")
+	}
+}
+
+func TestRemoveNonexistent(t *testing.T) {
+	err := Remove("/nonexistent/worktree/path/that/does/not/exist")
+	if err == nil {
+		t.Error("Remove should return an error for a nonexistent path")
+	}
+}
+
 func TestSlugifyMaxLength(t *testing.T) {
 	long := "a"
 	for i := 0; i < 100; i++ {

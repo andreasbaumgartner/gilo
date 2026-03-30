@@ -14,6 +14,7 @@ import (
 	"github.com/andreasbaumgartner/gilo/internal/github"
 	"github.com/andreasbaumgartner/gilo/internal/settings"
 	"github.com/andreasbaumgartner/gilo/internal/tmux"
+	"github.com/andreasbaumgartner/gilo/internal/worktree"
 )
 
 // Sort columns
@@ -60,6 +61,15 @@ type tmuxWindowKilledMsg struct {
 }
 type tmuxStatusMsg []tmux.Pane
 type tmuxTickMsg struct{}
+type worktreeListMsg struct {
+	entries []worktree.WorktreeEntry
+	err     error
+}
+type worktreeRemovedMsg struct {
+	removed []string
+	failed  string
+	err     error
+}
 type refreshTickMsg struct{}
 type linkedPRsMsg struct {
 	prs map[int]github.PR
@@ -91,6 +101,7 @@ const (
 	modalCloseConfirm
 	modalPermissionWarning
 	modalKillWindowConfirm
+	modalWorktreeCleanup
 	modalMerge
 	modalMergeConfirm
 	modalHelp
@@ -130,6 +141,10 @@ type model struct {
 
 	tmuxPanes []tmux.Pane
 	linkedPRs map[int]github.PR
+
+	worktreeEntries  []worktree.WorktreeEntry
+	worktreeCursor   int
+	worktreeSelected map[int]bool
 
 	refreshing bool
 
