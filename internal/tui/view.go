@@ -266,6 +266,17 @@ func (m model) renderModal() string {
 		hint := dimStyle.Render("y confirm  │  n/esc cancel")
 		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
 
+	case modalUpdateConfirm:
+		title := titleStyle.Render("Update gilo")
+		var body string
+		if m.modalStatus != "" {
+			body = m.modalStatus
+		} else {
+			body = "Download and install the latest version of gilo?"
+		}
+		hint := dimStyle.Render("y confirm  │  n/esc cancel")
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
 	case modalHelp:
 		title := titleStyle.Render("keybindings")
 		sections := []string{
@@ -303,6 +314,7 @@ func (m model) renderModal() string {
 			"  " + greenStyle.Render("r") + "         allow-root",
 			"  " + greenStyle.Render("t") + "         color scheme",
 			"  " + greenStyle.Render("m") + "         cycle issues max",
+			"  " + greenStyle.Render("u") + "         update gilo",
 			"",
 			dimStyle.Render("esc/?  close"),
 		}
@@ -674,7 +686,7 @@ func (m model) renderStatusBar() string {
 		keys = []string{"j/k navigate", "enter select", "esc cancel"}
 	case modalMergeConfirm:
 		keys = []string{"y confirm", "n/esc cancel"}
-	case modalDeleteConfirm, modalCloseConfirm, modalKillWindowConfirm:
+	case modalDeleteConfirm, modalCloseConfirm, modalKillWindowConfirm, modalUpdateConfirm:
 		keys = []string{"y confirm", "n/esc cancel"}
 	case modalWorktreeCleanup:
 		keys = []string{"j/k navigate", "space select", "ctrl+d remove", "esc cancel"}
@@ -725,6 +737,7 @@ func (m model) renderStatusBar() string {
 			"M merge",
 			"x close",
 			"n new",
+			"u update",
 			"? help",
 			"q quit",
 		}

@@ -70,6 +70,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.modalStatus = fmt.Sprintf("Failed to switch to tmux window: %s", msg.windowName)
 		}
 
+	case selfUpdateMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Update failed: %v", msg.err)
+			return m, nil
+		}
+		// Update succeeded — quit so main can re-exec the new binary
+		m.modal = modalNone
+		return m, tea.Quit
+
 	case issuesLoadedMsg:
 		m.issues = []github.Issue(msg)
 		m.loaded = true
@@ -391,6 +400,17 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.modalStatus = "Reopening issue..."
 			return m, reopenIssueCmd(num)
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
+	case modalUpdateConfirm:
+		switch msg.String() {
+		case "y", "Y":
+			m.modalStatus = "Updating gilo..."
+			return m, selfUpdateCmd()
 		case "n", "N", "esc":
 			m.modal = modalNone
 			m.modalStatus = ""
@@ -824,6 +844,11 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "i":
 		m.settings.AdditionalContext = !m.settings.AdditionalContext
 		settings.Save(m.settings)
+		return m, nil
+
+	case "u":
+		m.modal = modalUpdateConfirm
+		m.modalStatus = ""
 		return m, nil
 
 	case "P":

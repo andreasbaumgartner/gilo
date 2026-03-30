@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/andreasbaumgartner/gilo/internal/tmux"
 	"github.com/andreasbaumgartner/gilo/internal/worktree"
 )
+
+const installScriptURL = "https://raw.githubusercontent.com/andreasbaumgartner/gilo/main/install.sh"
 
 func tmuxTickCmd() tea.Cmd {
 	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
@@ -127,6 +130,14 @@ func removeWorktreesCmd(paths []string) tea.Cmd {
 			removed = append(removed, p)
 		}
 		return worktreeRemovedMsg{removed: removed}
+	}
+}
+
+func selfUpdateCmd() tea.Cmd {
+	return func() tea.Msg {
+		cmd := exec.Command("sh", "-c", fmt.Sprintf("curl -fsSL %s | sh", installScriptURL))
+		err := cmd.Run()
+		return selfUpdateMsg{err: err}
 	}
 }
 

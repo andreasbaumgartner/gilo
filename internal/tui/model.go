@@ -71,6 +71,7 @@ type worktreeRemovedMsg struct {
 	err     error
 }
 type refreshTickMsg struct{}
+type selfUpdateMsg struct{ err error }
 type linkedPRsMsg struct {
 	prs map[int]github.PR
 	err error
@@ -105,6 +106,7 @@ const (
 	modalMerge
 	modalMergeConfirm
 	modalHelp
+	modalUpdateConfirm
 )
 
 // Model
