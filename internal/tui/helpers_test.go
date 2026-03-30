@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -61,7 +62,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("listW", func(t *testing.T) {
 		got := m.listW()
-		want := 40 // 100*38/100=38, clamped up to listMinW=40
+		want := 50 // 100*45/100=45, clamped up to listMinW=50
 		if got != want {
 			t.Errorf("listW() = %d, want %d", got, want)
 		}
@@ -69,7 +70,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("detailW", func(t *testing.T) {
 		got := m.detailW()
-		want := 60 // 100 - 40
+		want := 50 // 100 - 50
 		if got != want {
 			t.Errorf("detailW() = %d, want %d", got, want)
 		}
@@ -85,7 +86,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("listInnerW", func(t *testing.T) {
 		got := m.listInnerW()
-		want := 36 // 40 - 4
+		want := 46 // 50 - 4
 		if got != want {
 			t.Errorf("listInnerW() = %d, want %d", got, want)
 		}
@@ -93,7 +94,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("detailInnerW", func(t *testing.T) {
 		got := m.detailInnerW()
-		want := 56 // 60 - 4
+		want := 46 // 50 - 4
 		if got != want {
 			t.Errorf("detailInnerW() = %d, want %d", got, want)
 		}
@@ -114,9 +115,9 @@ func TestLayoutHelpersDynamic(t *testing.T) {
 		width      int
 		wantListW  int
 	}{
-		{"narrow terminal", 50, 19},        // 50*38/100=19, terminal too small for min clamp
-		{"medium terminal", 120, 45},        // 120*38/100=45, within bounds
-		{"wide terminal", 250, 80},          // 250*38/100=95, clamped to listMaxW=80
+		{"narrow terminal", 50, 22},         // 50*45/100=22, terminal too small for min clamp
+		{"medium terminal", 120, 54},        // 120*45/100=54, within bounds
+		{"wide terminal", 250, 100},         // 250*45/100=112, clamped to listMaxW=100
 		{"very narrow", 30, 10},             // 30-20=10
 	}
 
@@ -133,6 +134,98 @@ func TestLayoutHelpersDynamic(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestModalW(t *testing.T) {
+	tests := []struct {
+		name      string
+		width     int
+		wantMinW  int
+		wantMaxW  int
+	}{
+		{"narrow terminal", 60, 50, 56},
+		{"medium terminal", 120, 50, 70},
+		{"wide terminal", 200, 50, 70},
+		{"very narrow", 40, 36, 50},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := model{width: tt.width, height: 40}
+			got := m.modalW()
+			if got < tt.wantMinW && tt.width > tt.wantMinW+4 {
+				t.Errorf("modalW() with width=%d: got %d, want >= %d", tt.width, got, tt.wantMinW)
+			}
+			if got > tt.wantMaxW {
+				t.Errorf("modalW() with width=%d: got %d, want <= %d", tt.width, got, tt.wantMaxW)
+			}
+		})
+	}
+}
+
+func TestTextareaW(t *testing.T) {
+	m := model{width: 120, height: 40}
+	got := m.textareaW()
+	expected := m.modalW() - 6
+	if got != expected {
+		t.Errorf("textareaW() = %d, want %d (modalW=%d - 6)", got, expected, m.modalW())
+	}
+
+	// Minimum floor
+	small := model{width: 20, height: 40}
+	if small.textareaW() < 20 {
+		t.Errorf("textareaW() with narrow terminal = %d, want >= 20", small.textareaW())
+	}
+}
+
+func TestOverlayCenter(t *testing.T) {
+	// Simple background: 3 lines of text
+	bg := "AAAAAAAAAA\nBBBBBBBBBB\nCCCCCCCCCC\nDDDDDDDDDD\nEEEEEEEEEE"
+	modal := "XX\nYY"
+
+	result := overlayCenter(bg, modal, 10, 5)
+	lines := splitLines(result)
+
+	if len(lines) != 5 {
+		t.Fatalf("overlayCenter produced %d lines, want 5", len(lines))
+	}
+
+	// The modal should appear somewhere in the middle lines
+	// Lines 0 and 4 should be dimmed background only (no modal content)
+	// Lines 1-2 should contain the modal
+	found := false
+	for _, line := range lines {
+		if containsPlain(line, "XX") || containsPlain(line, "YY") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("overlayCenter: modal content not found in output")
+	}
+}
+
+func TestOverlayCenterPadding(t *testing.T) {
+	bg := ""
+	modal := "Hi"
+
+	result := overlayCenter(bg, modal, 20, 5)
+	lines := splitLines(result)
+
+	if len(lines) != 5 {
+		t.Fatalf("overlayCenter with empty bg produced %d lines, want 5", len(lines))
+	}
+}
+
+// splitLines splits a string on newlines, used by overlay tests.
+func splitLines(s string) []string {
+	return strings.Split(s, "\n")
+}
+
+// containsPlain checks if s contains sub after stripping ANSI codes.
+func containsPlain(s, sub string) bool {
+	// Simple check: the raw bytes should contain the substring
+	return strings.Contains(s, sub)
 }
 
 func TestLayoutHelpersZeroSize(t *testing.T) {

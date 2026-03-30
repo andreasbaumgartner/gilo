@@ -104,7 +104,8 @@ func TestModalKindConstants(t *testing.T) {
 	kinds := []modalKind{
 		modalNone, modalBrowser, modalComment, modalWorktree,
 		modalCreate, modalLabel, modalClaudeTask, modalDeleteConfirm,
-		modalPermissionWarning, modalHelp,
+		modalCloseConfirm, modalPermissionWarning, modalKillWindowConfirm,
+		modalMerge, modalMergeConfirm, modalHelp,
 	}
 	seen := make(map[modalKind]bool)
 	for _, k := range kinds {
@@ -112,6 +113,52 @@ func TestModalKindConstants(t *testing.T) {
 			t.Errorf("duplicate modalKind value: %d", k)
 		}
 		seen[k] = true
+	}
+}
+
+func TestMergeTargetsExcludesModalIssue(t *testing.T) {
+	issues := []github.Issue{
+		{Number: 1, Title: "Issue 1", State: "OPEN"},
+		{Number: 2, Title: "Issue 2", State: "OPEN"},
+		{Number: 3, Title: "Issue 3", State: "OPEN"},
+	}
+
+	m := model{
+		issues:      issues,
+		stateFilter: "",
+		modalIssue:  2,
+	}
+
+	targets := m.mergeTargets()
+	if len(targets) != 2 {
+		t.Fatalf("mergeTargets() returned %d items, want 2", len(targets))
+	}
+	for _, target := range targets {
+		if target.Number == 2 {
+			t.Error("mergeTargets() should not include the modal issue")
+		}
+	}
+}
+
+func TestMergeTargetsRespectsFilter(t *testing.T) {
+	issues := []github.Issue{
+		{Number: 1, Title: "Open 1", State: "OPEN"},
+		{Number: 2, Title: "Closed 1", State: "CLOSED"},
+		{Number: 3, Title: "Open 2", State: "OPEN"},
+	}
+
+	m := model{
+		issues:      issues,
+		stateFilter: "OPEN",
+		modalIssue:  1,
+	}
+
+	targets := m.mergeTargets()
+	if len(targets) != 1 {
+		t.Fatalf("mergeTargets() returned %d items, want 1", len(targets))
+	}
+	if targets[0].Number != 3 {
+		t.Errorf("mergeTargets()[0].Number = %d, want 3", targets[0].Number)
 	}
 }
 

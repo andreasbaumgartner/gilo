@@ -10,6 +10,20 @@ type Settings struct {
 	DangerouslySkipPermissions bool   `json:"dangerously_skip_permissions"`
 	PermissionWarningAcked     bool   `json:"permission_warning_acked"`
 	ColorScheme                string `json:"color_scheme,omitempty"`
+	IssuesMax                  int    `json:"issues_max,omitempty"`
+	AdditionalContext          bool   `json:"additional_context"`
+	PlanMode                   bool   `json:"plan_mode"`
+}
+
+const DefaultIssuesMax = 25
+
+var IssuesMaxOptions = []int{25, 50, 100, 200}
+
+func (s Settings) GetIssuesMax() int {
+	if s.IssuesMax <= 0 {
+		return DefaultIssuesMax
+	}
+	return s.IssuesMax
 }
 
 func path() string {

@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"os/exec"
+	"sort"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -12,7 +14,20 @@ import (
 	"github.com/andreasbaumgartner/gilo/internal/github"
 	"github.com/andreasbaumgartner/gilo/internal/settings"
 	"github.com/andreasbaumgartner/gilo/internal/tmux"
+	"github.com/andreasbaumgartner/gilo/internal/worktree"
 )
+
+// Sort columns
+type sortColumn int
+
+const (
+	sortByNumber sortColumn = iota
+	sortByTitle
+	sortByState
+	sortByCreated
+)
+
+var sortColumnNames = []string{"Number", "Title", "State", "Created"}
 
 // Messages
 
@@ -24,6 +39,7 @@ type issueCreatedMsg struct{ err error }
 type issueDeletedMsg struct{ err error }
 type issueClosedMsg struct{ err error }
 type issueReopenedMsg struct{ err error }
+type issueMergedMsg struct{ err error }
 type labelsLoadedMsg struct {
 	repoLabels  []github.RepoLabel
 	issueLabels map[string]bool
@@ -39,9 +55,27 @@ type tmuxJumpMsg struct {
 	windowName string
 	ok         bool
 }
+type tmuxWindowKilledMsg struct {
+	windowName string
+	ok         bool
+}
 type tmuxStatusMsg []tmux.Pane
 type tmuxTickMsg struct{}
+type worktreeListMsg struct {
+	entries []worktree.WorktreeEntry
+	err     error
+}
+type worktreeRemovedMsg struct {
+	removed []string
+	failed  string
+	err     error
+}
 type refreshTickMsg struct{}
+type selfUpdateMsg struct{ err error }
+type linkedPRsMsg struct {
+	prs map[int]github.PR
+	err error
+}
 
 // Focus
 
@@ -67,7 +101,12 @@ const (
 	modalDeleteConfirm
 	modalCloseConfirm
 	modalPermissionWarning
+	modalKillWindowConfirm
+	modalWorktreeCleanup
+	modalMerge
+	modalMergeConfirm
 	modalHelp
+	modalUpdateConfirm
 )
 
 // Model
@@ -87,11 +126,15 @@ type model struct {
 	modal            modalKind
 	modalIssue       int
 	modalStatus      string
-	modalCloseAction string // "close" or "reopen"
-	textarea    textarea.Model
+	modalCloseAction    string // "close" or "reopen"
+	modalKillWindowName string // tmux window name to kill
+	textarea            textarea.Model
 
 	textareaBody textarea.Model
 	createFocus  int
+
+	mergeTarget int // issue number to merge into
+	mergeCursor int // cursor in the merge target list
 
 	repoLabels    []github.RepoLabel
 	labelSelected map[string]bool
@@ -99,6 +142,11 @@ type model struct {
 	labelCursor   int
 
 	tmuxPanes []tmux.Pane
+	linkedPRs map[int]github.PR
+
+	worktreeEntries  []worktree.WorktreeEntry
+	worktreeCursor   int
+	worktreeSelected map[int]bool
 
 	refreshing bool
 
@@ -106,7 +154,15 @@ type model struct {
 
 	stateFilter string
 
+	sortCol sortColumn
+	sortAsc bool
+
+	pendingKey string // prefix key waiting for second keystroke (e.g. "f")
+
 	settings settings.Settings
+
+	listWidthOverride int  // 0 = use default, >0 = user-dragged width
+	draggingBorder    bool // true while mouse is dragging the panel border
 }
 
 func initialModel() model {
@@ -127,12 +183,45 @@ func initialModel() model {
 }
 
 func (m model) filteredIssues() []github.Issue {
-	if m.stateFilter == "" {
-		return m.issues
-	}
 	var out []github.Issue
-	for _, issue := range m.issues {
-		if issue.State == m.stateFilter {
+	if m.stateFilter == "" {
+		out = make([]github.Issue, len(m.issues))
+		copy(out, m.issues)
+	} else {
+		for _, issue := range m.issues {
+			if issue.State == m.stateFilter {
+				out = append(out, issue)
+			}
+		}
+	}
+
+	sort.SliceStable(out, func(i, j int) bool {
+		var less bool
+		switch m.sortCol {
+		case sortByTitle:
+			less = strings.ToLower(out[i].Title) < strings.ToLower(out[j].Title)
+		case sortByState:
+			less = out[i].State < out[j].State
+		case sortByCreated:
+			less = out[i].CreatedAt < out[j].CreatedAt
+		default: // sortByNumber
+			less = out[i].Number < out[j].Number
+		}
+		if m.sortAsc {
+			return less
+		}
+		return !less
+	})
+
+	return out
+}
+
+// mergeTargets returns all issues except the current modal issue, for use as
+// merge target candidates.
+func (m model) mergeTargets() []github.Issue {
+	var out []github.Issue
+	for _, issue := range m.filteredIssues() {
+		if issue.Number != m.modalIssue {
 			out = append(out, issue)
 		}
 	}
@@ -140,7 +229,7 @@ func (m model) filteredIssues() []github.Issue {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(fetchIssuesCmd, fetchTmuxStatusCmd, tmuxTickCmd(), refreshTickCmd())
+	return tea.Batch(fetchIssuesCmd(m.settings.GetIssuesMax()), fetchTmuxStatusCmd, tmuxTickCmd(), refreshTickCmd())
 }
 
 // Run starts the TUI application.

@@ -10,10 +10,30 @@ import (
 	"github.com/andreasbaumgartner/gilo/internal/github"
 	"github.com/andreasbaumgartner/gilo/internal/settings"
 	"github.com/andreasbaumgartner/gilo/internal/tmux"
+	"github.com/andreasbaumgartner/gilo/internal/worktree"
 )
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+
+	case tea.MouseMsg:
+		switch msg.Action {
+		case tea.MouseActionPress:
+			// Start drag if clicking near the panel border (listW boundary ±1)
+			border := m.listW()
+			if msg.X >= border-1 && msg.X <= border+1 {
+				m.draggingBorder = true
+			}
+		case tea.MouseActionRelease:
+			m.draggingBorder = false
+		case tea.MouseActionMotion:
+			if m.draggingBorder {
+				m.listWidthOverride = msg.X
+				m.viewport.Width = m.detailInnerW()
+				m.viewport.Height = m.detailInnerH()
+				m.updateViewport()
+			}
+		}
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -26,13 +46,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case refreshTickMsg:
 		m.refreshing = true
-		return m, tea.Batch(fetchIssuesCmd, refreshTickCmd())
+		return m, tea.Batch(fetchIssuesCmd(m.settings.GetIssuesMax()), refreshTickCmd())
 
 	case tmuxStatusMsg:
 		m.tmuxPanes = msg
 		if m.loaded && len(m.issues) > 0 {
 			m.updateViewport()
 		}
+
+	case tmuxWindowKilledMsg:
+		if msg.ok {
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, fetchTmuxStatusCmd
+		}
+		m.modalStatus = fmt.Sprintf("Failed to close tmux window: %s", msg.windowName)
 
 	case tmuxJumpMsg:
 		if msg.ok {
@@ -41,6 +69,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modalStatus = fmt.Sprintf("Failed to switch to tmux window: %s", msg.windowName)
 		}
+
+	case selfUpdateMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Update failed: %v", msg.err)
+			return m, nil
+		}
+		// Update succeeded — quit so main can re-exec the new binary
+		m.modal = modalNone
+		return m, tea.Quit
 
 	case issuesLoadedMsg:
 		m.issues = []github.Issue(msg)
@@ -52,6 +89,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.clampListOffset()
 		m.updateViewport()
+		return m, fetchLinkedPRsCmd(m.settings.GetIssuesMax())
+
+	case linkedPRsMsg:
+		if msg.err == nil {
+			m.linkedPRs = msg.prs
+			m.updateViewport()
+		}
 
 	case errMsg:
 		m.err = msg.err
@@ -71,7 +115,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case issueCreatedMsg:
@@ -80,7 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case issueDeletedMsg:
@@ -89,7 +133,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case issueClosedMsg:
@@ -98,7 +142,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case issueReopenedMsg:
@@ -107,7 +151,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
+		}
+
+	case issueMergedMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Error: %v", msg.err)
+		} else {
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case labelsLoadedMsg:
@@ -126,7 +179,53 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
+		}
+
+	case worktreeListMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Error: %v", msg.err)
+		} else {
+			// Filter out the main worktree (bare or no branch prefix "issue-")
+			var filtered []worktree.WorktreeEntry
+			for _, e := range msg.entries {
+				if !e.Bare && strings.HasPrefix(e.Branch, "issue-") {
+					filtered = append(filtered, e)
+				}
+			}
+			m.worktreeEntries = filtered
+			m.worktreeCursor = 0
+			m.worktreeSelected = make(map[int]bool)
+			if len(filtered) == 0 {
+				m.modalStatus = "No issue worktrees found."
+			} else {
+				m.modalStatus = ""
+			}
+		}
+
+	case worktreeRemovedMsg:
+		// Remove successfully deleted entries from the list
+		removedSet := make(map[string]bool)
+		for _, p := range msg.removed {
+			removedSet[p] = true
+		}
+		var remaining []worktree.WorktreeEntry
+		for _, e := range m.worktreeEntries {
+			if !removedSet[e.Path] {
+				remaining = append(remaining, e)
+			}
+		}
+		m.worktreeEntries = remaining
+		m.worktreeSelected = make(map[int]bool)
+		if m.worktreeCursor >= len(remaining) {
+			m.worktreeCursor = max(0, len(remaining)-1)
+		}
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Removed %d worktree(s). Error on %s:\n%v", len(msg.removed), msg.failed, msg.err)
+		} else if len(remaining) == 0 {
+			m.modalStatus = "All worktrees cleaned up!"
+		} else {
+			m.modalStatus = fmt.Sprintf("Removed %d worktree(s).", len(msg.removed))
 		}
 
 	case worktreeCreatedMsg:
@@ -228,6 +327,69 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case modalKillWindowConfirm:
+		switch msg.String() {
+		case "y", "Y":
+			windowName := m.modalKillWindowName
+			m.modalStatus = "Closing tmux window..."
+			return m, func() tea.Msg {
+				ok := tmux.KillWindow(windowName)
+				return tmuxWindowKilledMsg{windowName: windowName, ok: ok}
+			}
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
+	case modalMerge:
+		switch msg.String() {
+		case "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, nil
+		case "j", "down":
+			targets := m.mergeTargets()
+			if m.mergeCursor < len(targets)-1 {
+				m.mergeCursor++
+			}
+			return m, nil
+		case "k", "up":
+			if m.mergeCursor > 0 {
+				m.mergeCursor--
+			}
+			return m, nil
+		case "enter":
+			targets := m.mergeTargets()
+			if len(targets) > 0 {
+				m.mergeTarget = targets[m.mergeCursor].Number
+				m.modal = modalMergeConfirm
+				m.modalStatus = ""
+			}
+			return m, nil
+		}
+		return m, nil
+
+	case modalMergeConfirm:
+		switch msg.String() {
+		case "y", "Y":
+			m.modalStatus = "Merging issues..."
+			var source, target github.Issue
+			for _, issue := range m.issues {
+				if issue.Number == m.modalIssue {
+					source = issue
+				}
+				if issue.Number == m.mergeTarget {
+					target = issue
+				}
+			}
+			return m, mergeIssuesCmd(source, target)
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
 	case modalCloseConfirm:
 		switch msg.String() {
 		case "y", "Y":
@@ -238,6 +400,17 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			m.modalStatus = "Reopening issue..."
 			return m, reopenIssueCmd(num)
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
+	case modalUpdateConfirm:
+		switch msg.String() {
+		case "y", "Y":
+			m.modalStatus = "Updating gilo..."
+			return m, selfUpdateCmd()
 		case "n", "N", "esc":
 			m.modal = modalNone
 			m.modalStatus = ""
@@ -301,6 +474,46 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, cmd
 
+	case modalWorktreeCleanup:
+		switch msg.String() {
+		case "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, nil
+		case "j", "down":
+			if m.worktreeCursor < len(m.worktreeEntries)-1 {
+				m.worktreeCursor++
+			}
+			return m, nil
+		case "k", "up":
+			if m.worktreeCursor > 0 {
+				m.worktreeCursor--
+			}
+			return m, nil
+		case " ":
+			if len(m.worktreeEntries) > 0 {
+				m.worktreeSelected[m.worktreeCursor] = !m.worktreeSelected[m.worktreeCursor]
+			}
+			return m, nil
+		case "ctrl+d":
+			// Remove selected worktrees (or the one under cursor if none selected)
+			var toRemove []string
+			for i, e := range m.worktreeEntries {
+				if m.worktreeSelected[i] {
+					toRemove = append(toRemove, e.Path)
+				}
+			}
+			if len(toRemove) == 0 && len(m.worktreeEntries) > 0 {
+				toRemove = append(toRemove, m.worktreeEntries[m.worktreeCursor].Path)
+			}
+			if len(toRemove) == 0 {
+				return m, nil
+			}
+			m.modalStatus = fmt.Sprintf("Removing %d worktree(s)...", len(toRemove))
+			return m, removeWorktreesCmd(toRemove)
+		}
+		return m, nil
+
 	case modalLabel:
 		switch msg.String() {
 		case "esc":
@@ -348,6 +561,47 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle pending prefix key (e.g. "f" for filter/sort submenu)
+	if m.pendingKey == "f" {
+		m.pendingKey = ""
+		switch msg.String() {
+		case "f":
+			// Cycle filter: OPEN → CLOSED → ALL → OPEN
+			switch m.stateFilter {
+			case "OPEN":
+				m.stateFilter = "CLOSED"
+			case "CLOSED":
+				m.stateFilter = ""
+			default:
+				m.stateFilter = "OPEN"
+			}
+			filtered := m.filteredIssues()
+			if m.cursor >= len(filtered) {
+				m.cursor = max(0, len(filtered)-1)
+			}
+			m.listOffset = 0
+			m.clampListOffset()
+			m.updateViewport()
+		case "s":
+			// Cycle to next sort column (descending by default)
+			m.sortCol = (m.sortCol + 1) % sortColumn(len(sortColumnNames))
+			m.sortAsc = false
+			m.cursor = 0
+			m.listOffset = 0
+			m.clampListOffset()
+			m.updateViewport()
+		case "d":
+			// Toggle sort direction for current column
+			m.sortAsc = !m.sortAsc
+			m.cursor = 0
+			m.listOffset = 0
+			m.clampListOffset()
+			m.updateViewport()
+		}
+		// Any unrecognized key just cancels the pending state
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -358,6 +612,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.focus = focusList
 		}
+		m.updateViewport()
 
 	case "j", "down":
 		if m.focus == focusList {
@@ -438,7 +693,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modal = modalClaudeTask
 			m.modalIssue = issue.Number
 			m.modalStatus = ""
-			return m, createClaudeTaskCmd(issue, msg.String() == "S", m.settings.DangerouslySkipPermissions)
+			return m, createClaudeTaskCmd(issue, msg.String() == "S", m.settings.DangerouslySkipPermissions, m.settings.AdditionalContext, m.settings.PlanMode)
 		}
 
 	case "p":
@@ -463,7 +718,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			ta := textarea.New()
 			ta.Placeholder = "Write your comment..."
 			ta.Focus()
-			ta.SetWidth(48)
+			ta.SetWidth(m.textareaW())
 			ta.SetHeight(8)
 			m.textarea = ta
 		}
@@ -476,7 +731,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ta := textarea.New()
 		ta.Placeholder = "Issue title..."
 		ta.Focus()
-		ta.SetWidth(48)
+		ta.SetWidth(m.textareaW())
 		ta.SetHeight(1)
 		ta.CharLimit = 256
 		m.textarea = ta
@@ -484,7 +739,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		tb := textarea.New()
 		tb.Placeholder = "Describe the issue..."
 		tb.Blur()
-		tb.SetWidth(48)
+		tb.SetWidth(m.textareaW())
 		tb.SetHeight(6)
 		m.textareaBody = tb
 
@@ -514,12 +769,43 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "M":
+		filtered := m.filteredIssues()
+		if len(filtered) > 1 {
+			m.modal = modalMerge
+			m.modalIssue = filtered[m.cursor].Number
+			m.modalStatus = ""
+			m.mergeCursor = 0
+		}
+		return m, nil
+
 	case "d":
 		filtered := m.filteredIssues()
 		if len(filtered) > 0 {
 			m.modal = modalDeleteConfirm
 			m.modalIssue = filtered[m.cursor].Number
 			m.modalStatus = ""
+		}
+		return m, nil
+
+	case "C":
+		m.modal = modalWorktreeCleanup
+		m.modalStatus = "Loading worktrees..."
+		return m, listWorktreesCmd()
+
+	case "K":
+		filtered := m.filteredIssues()
+		if len(filtered) > 0 {
+			issue := filtered[m.cursor]
+			for _, p := range m.tmuxPanes {
+				if p.IssueNum == issue.Number {
+					m.modal = modalKillWindowConfirm
+					m.modalIssue = issue.Number
+					m.modalKillWindowName = p.WindowName
+					m.modalStatus = ""
+					return m, nil
+				}
+			}
 		}
 		return m, nil
 
@@ -531,25 +817,12 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "g":
 		if !m.refreshing {
 			m.refreshing = true
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case "f":
-		switch m.stateFilter {
-		case "OPEN":
-			m.stateFilter = "CLOSED"
-		case "CLOSED":
-			m.stateFilter = ""
-		default:
-			m.stateFilter = "OPEN"
-		}
-		filtered := m.filteredIssues()
-		if m.cursor >= len(filtered) {
-			m.cursor = max(0, len(filtered)-1)
-		}
-		m.listOffset = 0
-		m.clampListOffset()
-		m.updateViewport()
+		m.pendingKey = "f"
+		return m, nil
 
 	case "t":
 		current := m.settings.ColorScheme
@@ -567,6 +840,36 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.settings.ColorScheme = next
 		settings.Save(m.settings)
 		m.updateViewport()
+
+	case "i":
+		m.settings.AdditionalContext = !m.settings.AdditionalContext
+		settings.Save(m.settings)
+		return m, nil
+
+	case "u":
+		m.modal = modalUpdateConfirm
+		m.modalStatus = ""
+		return m, nil
+
+	case "P":
+		m.settings.PlanMode = !m.settings.PlanMode
+		settings.Save(m.settings)
+		return m, nil
+
+	case "m":
+		current := m.settings.GetIssuesMax()
+		opts := settings.IssuesMaxOptions
+		next := opts[0]
+		for i, v := range opts {
+			if v == current {
+				next = opts[(i+1)%len(opts)]
+				break
+			}
+		}
+		m.settings.IssuesMax = next
+		settings.Save(m.settings)
+		m.refreshing = true
+		return m, fetchIssuesCmd(next)
 	}
 
 	return m, nil

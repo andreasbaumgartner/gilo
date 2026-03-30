@@ -27,6 +27,17 @@ var (
 	reviewBadge    lipgloss.Style
 	keybindStyle   lipgloss.Style
 	modalStyle     lipgloss.Style
+
+	prBadge        lipgloss.Style
+	prMergedBadge  lipgloss.Style
+	prClosedBadge  lipgloss.Style
+
+	// New styles for design refresh
+	accentBorder  lipgloss.Style
+	dotRunning    lipgloss.Style
+	dotThinking   lipgloss.Style
+	dotIdle       lipgloss.Style
+	tooltipStyle  lipgloss.Style
 )
 
 func init() {
@@ -56,8 +67,7 @@ func applyColorScheme(cs ColorScheme) {
 		Bold(true)
 
 	selectedStyle = lipgloss.NewStyle().
-		Background(colorActive).
-		Foreground(cs.SelectedFg).
+		Foreground(colorActive).
 		Bold(true)
 
 	dimStyle = lipgloss.NewStyle().Foreground(colorDim)
@@ -80,19 +90,31 @@ func applyColorScheme(cs ColorScheme) {
 	workingBadge = lipgloss.NewStyle().
 		Background(cs.WorkingBadgeBg).
 		Foreground(cs.WorkingBadgeFg).
-		Bold(true).
 		Padding(0, 1)
 
 	questionBadge = lipgloss.NewStyle().
 		Background(cs.QuestionBadgeBg).
 		Foreground(cs.QuestionBadgeFg).
-		Bold(true).
 		Padding(0, 1)
 
 	reviewBadge = lipgloss.NewStyle().
 		Background(cs.ReviewBadgeBg).
 		Foreground(cs.ReviewBadgeFg).
-		Bold(true).
+		Padding(0, 1)
+
+	prBadge = lipgloss.NewStyle().
+		Background(cs.PRBadgeBg).
+		Foreground(cs.PRBadgeFg).
+		Padding(0, 1)
+
+	prMergedBadge = lipgloss.NewStyle().
+		Background(cs.PRMergedBadgeBg).
+		Foreground(cs.PRMergedBadgeFg).
+		Padding(0, 1)
+
+	prClosedBadge = lipgloss.NewStyle().
+		Background(cs.PRClosedBadgeBg).
+		Foreground(cs.PRClosedBadgeFg).
 		Padding(0, 1)
 
 	keybindStyle = lipgloss.NewStyle().
@@ -101,8 +123,28 @@ func applyColorScheme(cs ColorScheme) {
 		Padding(0, 1)
 
 	modalStyle = lipgloss.NewStyle().
-		Border(lipgloss.DoubleBorder()).
+		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorActive).
-		Padding(1, 2).
-		Width(54)
+		BorderBackground(cs.ModalBg).
+		Background(cs.ModalBg).
+		Padding(1, 2)
+
+	// Accent border for selected items (green left bar)
+	accentBorder = lipgloss.NewStyle().
+		BorderLeft(true).
+		BorderStyle(lipgloss.ThickBorder()).
+		BorderForeground(cs.AccentBorder).
+		PaddingLeft(1)
+
+	// Colored dot styles for tab bar indicators
+	dotRunning = lipgloss.NewStyle().Foreground(cs.DotRunning)
+	dotThinking = lipgloss.NewStyle().Foreground(cs.DotThinking)
+	dotIdle = lipgloss.NewStyle().Foreground(cs.DotIdle)
+
+	tooltipStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorActive).
+		Background(cs.ModalBg).
+		BorderBackground(cs.ModalBg).
+		Padding(0, 1)
 }

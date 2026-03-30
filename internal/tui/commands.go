@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -11,6 +12,8 @@ import (
 	"github.com/andreasbaumgartner/gilo/internal/tmux"
 	"github.com/andreasbaumgartner/gilo/internal/worktree"
 )
+
+const installScriptURL = "https://raw.githubusercontent.com/andreasbaumgartner/gilo/main/install.sh"
 
 func tmuxTickCmd() tea.Cmd {
 	return tea.Tick(3*time.Second, func(t time.Time) tea.Msg {
@@ -28,12 +31,21 @@ func fetchTmuxStatusCmd() tea.Msg {
 	return tmuxStatusMsg(tmux.FetchStatus())
 }
 
-func fetchIssuesCmd() tea.Msg {
-	issues, err := github.FetchIssues()
-	if err != nil {
-		return errMsg{err}
+func fetchIssuesCmd(limit int) tea.Cmd {
+	return func() tea.Msg {
+		issues, err := github.FetchIssues(limit)
+		if err != nil {
+			return errMsg{err}
+		}
+		return issuesLoadedMsg(issues)
 	}
-	return issuesLoadedMsg(issues)
+}
+
+func fetchLinkedPRsCmd(limit int) tea.Cmd {
+	return func() tea.Msg {
+		prs, err := github.FetchLinkedPRs(limit)
+		return linkedPRsMsg{prs: prs, err: err}
+	}
 }
 
 func fetchLabelsCmd(issue github.Issue) tea.Cmd {
@@ -74,6 +86,12 @@ func deleteIssueCmd(issueNum int) tea.Cmd {
 	}
 }
 
+func mergeIssuesCmd(source, target github.Issue) tea.Cmd {
+	return func() tea.Msg {
+		return issueMergedMsg{github.MergeIssues(source, target)}
+	}
+}
+
 func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
@@ -84,24 +102,74 @@ func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	}
 }
 
-func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions bool) tea.Cmd {
+func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissions bool, additionalContext bool, planMode bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
 		if err != nil {
 			return claudeTaskCreatedMsg{tmux.ClaudeResult{Err: err, Branch: branch}}
 		}
-		prompt := buildClaudePrompt(issue)
-		return claudeTaskCreatedMsg{tmux.OpenClaude(branch, path, existed, prompt, split, dangerouslySkipPermissions)}
+		prompt := buildClaudePrompt(issue, additionalContext)
+		return claudeTaskCreatedMsg{tmux.OpenClaude(branch, path, existed, prompt, split, dangerouslySkipPermissions, planMode)}
 	}
 }
 
-func buildClaudePrompt(issue github.Issue) string {
+func listWorktreesCmd() tea.Cmd {
+	return func() tea.Msg {
+		entries, err := worktree.List()
+		return worktreeListMsg{entries: entries, err: err}
+	}
+}
+
+func removeWorktreesCmd(paths []string) tea.Cmd {
+	return func() tea.Msg {
+		var removed []string
+		for _, p := range paths {
+			if err := worktree.Remove(p); err != nil {
+				return worktreeRemovedMsg{removed: removed, failed: p, err: err}
+			}
+			removed = append(removed, p)
+		}
+		return worktreeRemovedMsg{removed: removed}
+	}
+}
+
+func selfUpdateCmd() tea.Cmd {
+	return func() tea.Msg {
+		cmd := exec.Command("sh", "-c", fmt.Sprintf("curl -fsSL %s | sh", installScriptURL))
+		err := cmd.Run()
+		return selfUpdateMsg{err: err}
+	}
+}
+
+func buildClaudePrompt(issue github.Issue, additionalContext bool) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("GitHub Issue #%d: %s", issue.Number, issue.Title))
+
+	if additionalContext {
+		sb.WriteString(fmt.Sprintf("\nAuthor: %s", issue.Author.Login))
+		sb.WriteString(fmt.Sprintf("\nCreated: %s", issue.CreatedAt))
+		sb.WriteString(fmt.Sprintf("\nState: %s", issue.State))
+		if len(issue.Labels) > 0 {
+			names := make([]string, len(issue.Labels))
+			for i, l := range issue.Labels {
+				names[i] = l.Name
+			}
+			sb.WriteString(fmt.Sprintf("\nLabels: %s", strings.Join(names, ", ")))
+		}
+	}
+
 	if issue.Body != "" {
 		sb.WriteString("\n\n")
 		sb.WriteString(issue.Body)
 	}
+
+	if additionalContext && len(issue.Comments) > 0 {
+		sb.WriteString("\n\n--- Comments ---")
+		for _, c := range issue.Comments {
+			sb.WriteString(fmt.Sprintf("\n\n%s (%s):\n%s", c.Author.Login, c.CreatedAt, c.Body))
+		}
+	}
+
 	sb.WriteString("\n\nPlease work on this issue.")
 	return sb.String()
 }
