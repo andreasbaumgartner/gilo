@@ -44,6 +44,16 @@ func (m model) listW() int {
 	if m.width <= 0 {
 		return 0
 	}
+	if m.listWidthOverride > 0 {
+		w := m.listWidthOverride
+		if w < listMinW {
+			w = listMinW
+		}
+		if w > m.width-20 {
+			w = m.width - 20
+		}
+		return w
+	}
 	w := m.width * 45 / 100
 	if w < listMinW && m.width >= listMinW+20 {
 		w = listMinW

@@ -43,12 +43,12 @@ func (m model) View() string {
 		}
 		tooltip := tooltipStyle.Width(maxW).Render(fullTitle)
 		// Position tooltip just below the selected row inside the list panel
-		// +1 for panel border, +2 for header rows (title + blank line)
+		// +1 for panel border, +4 for header rows (title + blank + column header + separator)
 		scrollOffset := 0
 		if m.listOffset > 0 {
 			scrollOffset = 1 // "↑ N more" indicator row
 		}
-		tooltipY := 1 + 2 + scrollOffset + (row - m.listOffset) + 1
+		tooltipY := 1 + 4 + scrollOffset + (row - m.listOffset) + 1
 		tooltipX := 1 // inside left panel border
 		screen = overlayAt(screen, tooltip, tooltipX, tooltipY, m.width, m.height)
 	}
@@ -269,8 +269,26 @@ func (m model) renderList() string {
 		header = dimStyle.Render("Issues") + " " + dimStyle.Render(fmt.Sprintf("(%d)", count)) + " " + dimStyle.Render(filterLabel) + " " + sortLabel + refreshIndicator
 	}
 
+	// Column header row matching data layout
+	const statusColWidth = 12
+	const prColWidth = 12
+	colPrefixW := 4 + 6
+	colRightW := statusColWidth + prColWidth
+	colTitleW := innerW - colPrefixW - colRightW
+	if colTitleW < 4 {
+		colTitleW = 4
+	}
+	colLeft := "  " + dimStyle.Render(padRight("Issue", colTitleW+8))
+	colRight := dimStyle.Render(padRight(" Status", statusColWidth)) + dimStyle.Render(padRight(" PR", prColWidth))
+	colHeaderGap := innerW - lipgloss.Width(colLeft) - lipgloss.Width(colRight)
+	if colHeaderGap < 1 {
+		colHeaderGap = 1
+	}
+	colHeader := colLeft + strings.Repeat(" ", colHeaderGap) + colRight
+	separator := dimStyle.Render(strings.Repeat("─", innerW))
+
 	var rows []string
-	rows = append(rows, header, "")
+	rows = append(rows, header, "", colHeader, separator)
 
 	if !m.loaded {
 		rows = append(rows, "  "+dimStyle.Render("Loading..."))
@@ -340,8 +358,6 @@ func (m model) renderList() string {
 			}
 
 			// Build right-aligned status + PR columns
-			const statusColWidth = 12
-			const prColWidth = 12
 			statusCol := padRight(" "+statusBadge, statusColWidth)
 			prColumn := padRight(" "+prCol, prColWidth)
 			rightCols := statusCol + prColumn
@@ -412,11 +428,45 @@ func (m model) renderList() string {
 
 func (m model) renderDetail() string {
 	active := m.focus == focusDetail
+	w := m.detailInnerW()
+
+	// Build fixed header with issue title matching left panel row count
+	filtered := m.filteredIssues()
+	var issueTitle string
+	if m.loaded && len(filtered) > 0 && m.cursor < len(filtered) {
+		issue := filtered[m.cursor]
+		prefix := fmt.Sprintf("#%d  ", issue.Number)
+		if active {
+			issueTitle = titleStyle.Render(prefix + truncate(issue.Title, w-lipgloss.Width(prefix)))
+		} else {
+			issueTitle = dimStyle.Render(prefix + truncate(issue.Title, w-lipgloss.Width(prefix)))
+		}
+	} else {
+		if active {
+			issueTitle = titleStyle.Render("Detail")
+		} else {
+			issueTitle = dimStyle.Render("Detail")
+		}
+	}
+
+	separator := dimStyle.Render(strings.Repeat("─", w))
+	// Match left panel: title, blank, detail label, separator
+	detailLabel := dimStyle.Render("Detail")
+	header := issueTitle + "\n\n" + detailLabel + "\n" + separator + "\n"
+
+	headerH := 4 // title + blank + detail label + separator
+	vpHeight := m.mainH() - 2 - headerH
+	if vpHeight < 1 {
+		vpHeight = 1
+	}
+	m.viewport.Height = vpHeight
+
+	content := header + m.viewport.View()
 	return panelBorder(active).
 		Width(m.detailW()-2).
 		Height(m.mainH()-2).
 		Padding(0, 1).
-		Render(m.viewport.View())
+		Render(content)
 }
 
 func (m model) renderDetailContent() string {
@@ -436,10 +486,6 @@ func (m model) renderDetailContent() string {
 	}
 
 	var b strings.Builder
-
-	prefix := fmt.Sprintf("#%d  ", issue.Number)
-	b.WriteString(titleStyle.Render(prefix + truncate(issue.Title, w-lipgloss.Width(prefix))))
-	b.WriteString("\n\n")
 
 	// Metadata in tree-view style
 	b.WriteString(dimStyle.Render("├── ") + dimStyle.Render("state   ") + stateColor.Render(stateLabel) + "\n")
