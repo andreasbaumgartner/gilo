@@ -302,47 +302,50 @@ func (m model) renderList() string {
 					break
 				}
 			}
-			if statusBadge == "" {
-				if pr, ok := m.linkedPRs[issue.Number]; ok {
-					switch pr.State {
-					case "MERGED":
-						statusBadge = prMergedBadge.Render("merged")
-					case "CLOSED":
-						statusBadge = prMergedBadge.Render("PR closed")
-					default:
-						statusBadge = prBadge.Render("PR")
-					}
+
+			prCol := ""
+			if pr, ok := m.linkedPRs[issue.Number]; ok {
+				switch pr.State {
+				case "MERGED":
+					prCol = prMergedBadge.Render("merged")
+				case "CLOSED":
+					prCol = prMergedBadge.Render("PR closed")
+				default:
+					prCol = prBadge.Render("PR")
 				}
 			}
 
 			// Fixed-width columns for consistent alignment
 			const statusColWidth = 12
+			const prColWidth = 12
 			statusCol := padRight(" "+statusBadge, statusColWidth)
+			prColumn := padRight(" "+prCol, prColWidth)
 
 			pad := ""
 			if issue.State != "CLOSED" {
 				pad = " "
 			}
 
+			colsWidth := statusColWidth + prColWidth
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-15-statusColWidth)
+			title := truncate(issue.Title, innerW-15-colsWidth)
 
 			if i == m.cursor {
 				if active {
 					// Selected: green left accent + arrow indicator
 					indicator := greenStyle.Render("▶ ")
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-18-statusColWidth))
-					line := indicator + stateBadge + pad + statusCol + " " + selectedStyle.Render(rest)
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-18-colsWidth))
+					line := indicator + stateBadge + pad + statusCol + prColumn + " " + selectedStyle.Render(rest)
 					rows = append(rows, line)
 				} else {
-					line := "  " + stateBadge + pad + statusCol + " " + num + " " + title
+					line := "  " + stateBadge + pad + statusCol + prColumn + " " + num + " " + title
 					line = lipgloss.NewStyle().
 						Foreground(activeScheme.UnfocusedSelected).
 						Render(line)
 					rows = append(rows, line)
 				}
 			} else {
-				line := "  " + stateBadge + pad + statusCol + " " + num + " " + title
+				line := "  " + stateBadge + pad + statusCol + prColumn + " " + num + " " + title
 				rows = append(rows, line)
 			}
 		}
