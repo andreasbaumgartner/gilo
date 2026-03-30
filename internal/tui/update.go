@@ -551,6 +551,23 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.clampListOffset()
 		m.updateViewport()
 
+	case "a":
+		// Cycle to next sort column (descending by default)
+		m.sortCol = (m.sortCol + 1) % sortColumn(len(sortColumnNames))
+		m.sortAsc = false
+		m.cursor = 0
+		m.listOffset = 0
+		m.clampListOffset()
+		m.updateViewport()
+
+	case "A":
+		// Toggle sort direction for current column
+		m.sortAsc = !m.sortAsc
+		m.cursor = 0
+		m.listOffset = 0
+		m.clampListOffset()
+		m.updateViewport()
+
 	case "t":
 		current := m.settings.ColorScheme
 		if current == "" {

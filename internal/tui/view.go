@@ -174,6 +174,8 @@ func (m model) renderModal() string {
 			"  ↓/j       Move down",
 			"  tab       Switch panel",
 			"  f         Cycle filter (Open/Closed/All)",
+			"  a         Cycle sort column",
+			"  A         Toggle sort direction",
 			"",
 			dimStyle.Render("── Actions ──"),
 			"  enter     Jump to tmux window / open in browser",
@@ -225,9 +227,15 @@ func (m model) renderList() string {
 		refreshIndicator = " " + yellowStyle.Render("⟳")
 	}
 
-	header := titleStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]") + refreshIndicator
+	sortDir := "↓"
+	if m.sortAsc {
+		sortDir = "↑"
+	}
+	sortLabel := dimStyle.Render("[" + sortColumnNames[m.sortCol] + sortDir + "]")
+
+	header := titleStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]") + " " + sortLabel + refreshIndicator
 	if !active {
-		header = dimStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]") + refreshIndicator
+		header = dimStyle.Render("Issues") + " " + dimStyle.Render("["+filterLabel+"]") + " " + sortLabel + refreshIndicator
 	}
 
 	var rows []string
@@ -447,6 +455,7 @@ func (m model) renderStatusBar() string {
 			"↑↓/jk navigate",
 			"tab switch panel",
 			"f filter state",
+			"a/A sort",
 			"g refresh",
 			"enter jump/open",
 			"o browser",
