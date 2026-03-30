@@ -144,6 +144,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
+	case issueMergedMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Error: %v", msg.err)
+		} else {
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
+		}
+
 	case labelsLoadedMsg:
 		m.repoLabels = msg.repoLabels
 		m.labelSelected = make(map[string]bool)
@@ -271,6 +280,54 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				ok := tmux.KillWindow(windowName)
 				return tmuxWindowKilledMsg{windowName: windowName, ok: ok}
 			}
+		case "n", "N", "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+		}
+		return m, nil
+
+	case modalMerge:
+		switch msg.String() {
+		case "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, nil
+		case "j", "down":
+			targets := m.mergeTargets()
+			if m.mergeCursor < len(targets)-1 {
+				m.mergeCursor++
+			}
+			return m, nil
+		case "k", "up":
+			if m.mergeCursor > 0 {
+				m.mergeCursor--
+			}
+			return m, nil
+		case "enter":
+			targets := m.mergeTargets()
+			if len(targets) > 0 {
+				m.mergeTarget = targets[m.mergeCursor].Number
+				m.modal = modalMergeConfirm
+				m.modalStatus = ""
+			}
+			return m, nil
+		}
+		return m, nil
+
+	case modalMergeConfirm:
+		switch msg.String() {
+		case "y", "Y":
+			m.modalStatus = "Merging issues..."
+			var source, target github.Issue
+			for _, issue := range m.issues {
+				if issue.Number == m.modalIssue {
+					source = issue
+				}
+				if issue.Number == m.mergeTarget {
+					target = issue
+				}
+			}
+			return m, mergeIssuesCmd(source, target)
 		case "n", "N", "esc":
 			m.modal = modalNone
 			m.modalStatus = ""
@@ -602,6 +659,16 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else {
 				m.modalCloseAction = "reopen"
 			}
+		}
+		return m, nil
+
+	case "M":
+		filtered := m.filteredIssues()
+		if len(filtered) > 1 {
+			m.modal = modalMerge
+			m.modalIssue = filtered[m.cursor].Number
+			m.modalStatus = ""
+			m.mergeCursor = 0
 		}
 		return m, nil
 

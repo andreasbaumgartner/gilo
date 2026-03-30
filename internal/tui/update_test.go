@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -250,6 +251,244 @@ func TestKillWindowModalDismiss(t *testing.T) {
 		}
 		if cmd == nil {
 			t.Error("expected a command to be returned after confirming kill")
+		}
+	})
+}
+
+func TestMergeKeybind(t *testing.T) {
+	t.Run("M opens merge modal with multiple issues", func(t *testing.T) {
+		m := model{
+			width:       100,
+			height:      50,
+			loaded:      true,
+			stateFilter: "OPEN",
+			issues: []github.Issue{
+				{Number: 1, Title: "First issue", State: "OPEN"},
+				{Number: 2, Title: "Second issue", State: "OPEN"},
+			},
+			cursor: 0,
+			modal:  modalNone,
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'M'}}
+		result, _ := m.updateNormal(msg)
+		rm := result.(model)
+
+		// Default sort is descending by number, so cursor=0 is issue #2
+		if rm.modal != modalMerge {
+			t.Errorf("expected modal = modalMerge, got %d", rm.modal)
+		}
+		if rm.modalIssue != 2 {
+			t.Errorf("expected modalIssue = 2, got %d", rm.modalIssue)
+		}
+		if rm.mergeCursor != 0 {
+			t.Errorf("expected mergeCursor = 0, got %d", rm.mergeCursor)
+		}
+	})
+
+	t.Run("M does nothing with only one issue", func(t *testing.T) {
+		m := model{
+			width:       100,
+			height:      50,
+			loaded:      true,
+			stateFilter: "OPEN",
+			issues: []github.Issue{
+				{Number: 1, Title: "Only issue", State: "OPEN"},
+			},
+			cursor: 0,
+			modal:  modalNone,
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'M'}}
+		result, _ := m.updateNormal(msg)
+		rm := result.(model)
+
+		if rm.modal != modalNone {
+			t.Errorf("expected modal = modalNone with single issue, got %d", rm.modal)
+		}
+	})
+}
+
+func TestMergeModalNavigation(t *testing.T) {
+	t.Run("j moves cursor down", func(t *testing.T) {
+		m := model{
+			modal:       modalMerge,
+			modalIssue:  1,
+			mergeCursor: 0,
+			stateFilter: "",
+			issues: []github.Issue{
+				{Number: 1, State: "OPEN"},
+				{Number: 2, State: "OPEN"},
+				{Number: 3, State: "OPEN"},
+			},
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
+		result, _ := m.updateModal(msg)
+		rm := result.(model)
+
+		if rm.mergeCursor != 1 {
+			t.Errorf("expected mergeCursor = 1, got %d", rm.mergeCursor)
+		}
+	})
+
+	t.Run("k moves cursor up", func(t *testing.T) {
+		m := model{
+			modal:       modalMerge,
+			modalIssue:  1,
+			mergeCursor: 1,
+			stateFilter: "",
+			issues: []github.Issue{
+				{Number: 1, State: "OPEN"},
+				{Number: 2, State: "OPEN"},
+				{Number: 3, State: "OPEN"},
+			},
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
+		result, _ := m.updateModal(msg)
+		rm := result.(model)
+
+		if rm.mergeCursor != 0 {
+			t.Errorf("expected mergeCursor = 0, got %d", rm.mergeCursor)
+		}
+	})
+
+	t.Run("enter selects target and shows confirm", func(t *testing.T) {
+		m := model{
+			modal:       modalMerge,
+			modalIssue:  1,
+			mergeCursor: 0,
+			stateFilter: "",
+			issues: []github.Issue{
+				{Number: 1, State: "OPEN"},
+				{Number: 2, State: "OPEN"},
+				{Number: 3, State: "OPEN"},
+			},
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyEnter}
+		result, _ := m.updateModal(msg)
+		rm := result.(model)
+
+		// Default sort is descending, so targets (excluding #1) are: #3, #2
+		if rm.modal != modalMergeConfirm {
+			t.Errorf("expected modal = modalMergeConfirm, got %d", rm.modal)
+		}
+		if rm.mergeTarget != 3 {
+			t.Errorf("expected mergeTarget = 3, got %d", rm.mergeTarget)
+		}
+	})
+
+	t.Run("esc dismisses merge modal", func(t *testing.T) {
+		m := model{
+			modal:      modalMerge,
+			modalIssue: 1,
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyEscape}
+		result, _ := m.updateModal(msg)
+		rm := result.(model)
+
+		if rm.modal != modalNone {
+			t.Errorf("expected modal = modalNone, got %d", rm.modal)
+		}
+	})
+}
+
+func TestMergeConfirmModal(t *testing.T) {
+	t.Run("y confirms merge and returns command", func(t *testing.T) {
+		m := model{
+			modal:       modalMergeConfirm,
+			modalIssue:  1,
+			mergeTarget: 2,
+			issues: []github.Issue{
+				{Number: 1, Title: "Source", State: "OPEN"},
+				{Number: 2, Title: "Target", State: "OPEN"},
+			},
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}}
+		result, cmd := m.updateModal(msg)
+		rm := result.(model)
+
+		if rm.modalStatus != "Merging issues..." {
+			t.Errorf("expected modalStatus = %q, got %q", "Merging issues...", rm.modalStatus)
+		}
+		if cmd == nil {
+			t.Error("expected a command to be returned after confirming merge")
+		}
+	})
+
+	t.Run("n cancels merge confirm", func(t *testing.T) {
+		m := model{
+			modal:       modalMergeConfirm,
+			modalIssue:  1,
+			mergeTarget: 2,
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}
+		result, _ := m.updateModal(msg)
+		rm := result.(model)
+
+		if rm.modal != modalNone {
+			t.Errorf("expected modal = modalNone, got %d", rm.modal)
+		}
+	})
+
+	t.Run("esc cancels merge confirm", func(t *testing.T) {
+		m := model{
+			modal:       modalMergeConfirm,
+			modalIssue:  1,
+			mergeTarget: 2,
+		}
+
+		msg := tea.KeyMsg{Type: tea.KeyEscape}
+		result, _ := m.updateModal(msg)
+		rm := result.(model)
+
+		if rm.modal != modalNone {
+			t.Errorf("expected modal = modalNone, got %d", rm.modal)
+		}
+	})
+}
+
+func TestIssueMergedMsg(t *testing.T) {
+	t.Run("successful merge dismisses modal", func(t *testing.T) {
+		m := model{
+			modal:       modalMergeConfirm,
+			modalIssue:  1,
+			mergeTarget: 2,
+			modalStatus: "Merging issues...",
+		}
+
+		result, cmd := m.Update(issueMergedMsg{err: nil})
+		rm := result.(model)
+
+		if rm.modal != modalNone {
+			t.Errorf("expected modal = modalNone, got %d", rm.modal)
+		}
+		if rm.modalStatus != "" {
+			t.Errorf("expected empty modalStatus, got %q", rm.modalStatus)
+		}
+		if cmd == nil {
+			t.Error("expected a refresh command after successful merge")
+		}
+	})
+
+	t.Run("failed merge shows error", func(t *testing.T) {
+		m := model{
+			modal:       modalMergeConfirm,
+			modalIssue:  1,
+			mergeTarget: 2,
+			modalStatus: "Merging issues...",
+		}
+
+		result, _ := m.Update(issueMergedMsg{err: fmt.Errorf("merge failed")})
+		rm := result.(model)
+
+		if rm.modalStatus == "" || rm.modalStatus == "Merging issues..." {
+			t.Error("expected error message in modalStatus")
 		}
 	})
 }

@@ -185,6 +185,44 @@ func (m model) renderModal() string {
 			body = strings.Join(rows, "\n")
 		}
 		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+	case modalMerge:
+		title := titleStyle.Render(fmt.Sprintf("Merge #%d into...", m.modalIssue))
+		hint := dimStyle.Render("j/k navigate  │  enter select  │  esc cancel")
+		var body string
+		targets := m.mergeTargets()
+		if len(targets) == 0 {
+			body = dimStyle.Render("No other issues to merge into.")
+		} else {
+			var rows []string
+			for i, issue := range targets {
+				stateBadge := openBadge.Render("open")
+				if issue.State == "CLOSED" {
+					stateBadge = closedBadge.Render("closed")
+				}
+				line := fmt.Sprintf(" %s #%-4d %s", stateBadge, issue.Number, truncate(issue.Title, m.modalW()-28))
+				if i == m.mergeCursor {
+					line = selectedStyle.Render(fmt.Sprintf(" %s #%-4d %s", stateBadge, issue.Number, truncate(issue.Title, m.modalW()-28)))
+				}
+				rows = append(rows, line)
+			}
+			body = strings.Join(rows, "\n")
+		}
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
+	case modalMergeConfirm:
+		title := titleStyle.Render(fmt.Sprintf("Merge #%d into #%d", m.modalIssue, m.mergeTarget))
+		var body string
+		if m.modalStatus != "" {
+			body = m.modalStatus
+		} else {
+			body = fmt.Sprintf("This will:\n"+
+				"  - Post #%d's content as a comment on #%d\n"+
+				"  - Close #%d with a cross-reference\n\n"+
+				"Continue?", m.modalIssue, m.mergeTarget, m.modalIssue)
+		}
+		hint := dimStyle.Render("y confirm  │  n/esc cancel")
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+
 	case modalKillWindowConfirm:
 		title := titleStyle.Render(fmt.Sprintf("Close Tmux Window for #%d", m.modalIssue))
 		var body string
@@ -216,6 +254,7 @@ func (m model) renderModal() string {
 			"  " + greenStyle.Render("c") + "         comment",
 			"  " + greenStyle.Render("n") + "         new issue",
 			"  " + greenStyle.Render("x") + "         close/reopen",
+			"  " + greenStyle.Render("M") + "         merge issues",
 			"  " + greenStyle.Render("d") + "         delete",
 			"  " + greenStyle.Render("l") + "         labels",
 			"",
@@ -597,6 +636,10 @@ func (m model) renderStatusBar() string {
 		keys = []string{"j/k navigate", "space toggle", "ctrl+d submit", "esc cancel"}
 	case modalHelp:
 		keys = []string{"esc/? close"}
+	case modalMerge:
+		keys = []string{"j/k navigate", "enter select", "esc cancel"}
+	case modalMergeConfirm:
+		keys = []string{"y confirm", "n/esc cancel"}
 	case modalDeleteConfirm, modalCloseConfirm, modalKillWindowConfirm:
 		keys = []string{"y confirm", "n/esc cancel"}
 	case modalBrowser, modalWorktree, modalClaudeTask:
@@ -637,6 +680,7 @@ func (m model) renderStatusBar() string {
 			fmt.Sprintf("m max:%d", m.settings.GetIssuesMax()),
 			"t " + activeScheme.Name,
 			"l labels",
+			"M merge",
 			"x close",
 			"n new",
 			"? help",
