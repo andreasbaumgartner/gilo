@@ -20,20 +20,20 @@ func (m model) View() string {
 	left := m.renderList()
 	right := m.renderDetail()
 	body := lipgloss.JoinHorizontal(lipgloss.Top, left, right)
-	screen := body + "\n" + m.renderStatusBar()
+	statusBar := m.renderStatusBar()
+	screen := body + "\n" + statusBar
 
 	if m.modal != modalNone {
 		modal := m.renderModal()
-		screen = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, modal,
-			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(activeScheme.OverlayBg),
-		)
-
-		lines := strings.Split(screen, "\n")
+		// Render background content, then overlay modal with dimmed background
+		bg := body + "\n" + statusBar
+		overlay := overlayCenter(bg, modal, m.width, m.height)
+		// Re-apply un-dimmed status bar at the bottom
+		lines := strings.Split(overlay, "\n")
 		for len(lines) < m.height {
 			lines = append(lines, "")
 		}
-		lines[m.height-1] = m.renderStatusBar()
+		lines[m.height-1] = statusBar
 		screen = strings.Join(lines, "\n")
 	}
 
@@ -43,6 +43,7 @@ func (m model) View() string {
 // Modal
 
 func (m model) renderModal() string {
+	style := modalStyle.Width(m.modalW())
 	switch m.modal {
 	case modalBrowser:
 		content := fmt.Sprintf("Opening issue #%d in browser...", m.modalIssue)
@@ -50,7 +51,7 @@ func (m model) renderModal() string {
 			content = m.modalStatus
 		}
 		hint := dimStyle.Render("esc dismiss")
-		return modalStyle.Render(content + "\n\n" + hint)
+		return style.Render(content + "\n\n" + hint)
 
 	case modalWorktree:
 		title := titleStyle.Render(fmt.Sprintf("Worktree for #%d", m.modalIssue))
@@ -59,7 +60,7 @@ func (m model) renderModal() string {
 		if m.modalStatus != "" {
 			content = m.modalStatus
 		}
-		return modalStyle.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
+		return style.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
 
 	case modalClaudeTask:
 		title := titleStyle.Render(fmt.Sprintf("Claude Task for #%d", m.modalIssue))
@@ -74,7 +75,7 @@ func (m model) renderModal() string {
 		if m.settings.AdditionalContext {
 			content += "\n" + lipgloss.NewStyle().Foreground(colorActive).Render("📋 Sending with additional context (labels, comments, metadata)")
 		}
-		return modalStyle.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
+		return style.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
 
 	case modalPermissionWarning:
 		title := titleStyle.Render("⚠ Enable All Permissions")
@@ -85,7 +86,7 @@ func (m model) renderModal() string {
 				"Only enable this if you trust the environment and understand\n" +
 				"the risks.")
 		hint := dimStyle.Render("y confirm  │  n/esc cancel")
-		return modalStyle.Render(strings.Join([]string{title, "", warning, "", hint}, "\n"))
+		return style.Render(strings.Join([]string{title, "", warning, "", hint}, "\n"))
 
 	case modalCloseConfirm:
 		action := "Close"
@@ -102,7 +103,7 @@ func (m model) renderModal() string {
 			body = prompt
 		}
 		hint := dimStyle.Render("y confirm  │  n/esc cancel")
-		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
 
 	case modalDeleteConfirm:
 		title := titleStyle.Render(fmt.Sprintf("Delete Issue #%d", m.modalIssue))
@@ -113,7 +114,7 @@ func (m model) renderModal() string {
 			body = "Are you sure you want to delete this issue?\nThis action cannot be undone."
 		}
 		hint := dimStyle.Render("y confirm  │  n/esc cancel")
-		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
 
 	case modalComment:
 		title := titleStyle.Render(fmt.Sprintf("Comment on #%d", m.modalIssue))
@@ -124,7 +125,7 @@ func (m model) renderModal() string {
 		} else {
 			body = m.textarea.View()
 		}
-		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
 
 	case modalCreate:
 		title := titleStyle.Render("Create New Issue")
@@ -141,7 +142,7 @@ func (m model) renderModal() string {
 				m.textareaBody.View(),
 			}, "\n")
 		}
-		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
 
 	case modalLabel:
 		title := titleStyle.Render(fmt.Sprintf("Labels for #%d", m.modalIssue))
@@ -167,7 +168,7 @@ func (m model) renderModal() string {
 			}
 			body = strings.Join(rows, "\n")
 		}
-		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
 	case modalKillWindowConfirm:
 		title := titleStyle.Render(fmt.Sprintf("Close Tmux Window for #%d", m.modalIssue))
 		var body string
@@ -177,7 +178,7 @@ func (m model) renderModal() string {
 			body = fmt.Sprintf("Are you sure you want to close the tmux window\n\"%s\"?", m.modalKillWindowName)
 		}
 		hint := dimStyle.Render("y confirm  │  n/esc cancel")
-		return modalStyle.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
+		return style.Render(strings.Join([]string{title, "", body, "", hint}, "\n"))
 
 	case modalHelp:
 		title := titleStyle.Render("keybindings")
@@ -214,7 +215,7 @@ func (m model) renderModal() string {
 			"",
 			dimStyle.Render("esc/?  close"),
 		}
-		return modalStyle.Width(46).Render(strings.Join(sections, "\n"))
+		return style.Width(46).Render(strings.Join(sections, "\n"))
 	}
 	return ""
 }

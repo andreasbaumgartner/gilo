@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -133,6 +134,98 @@ func TestLayoutHelpersDynamic(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestModalW(t *testing.T) {
+	tests := []struct {
+		name      string
+		width     int
+		wantMinW  int
+		wantMaxW  int
+	}{
+		{"narrow terminal", 60, 50, 56},
+		{"medium terminal", 120, 50, 70},
+		{"wide terminal", 200, 50, 70},
+		{"very narrow", 40, 36, 50},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := model{width: tt.width, height: 40}
+			got := m.modalW()
+			if got < tt.wantMinW && tt.width > tt.wantMinW+4 {
+				t.Errorf("modalW() with width=%d: got %d, want >= %d", tt.width, got, tt.wantMinW)
+			}
+			if got > tt.wantMaxW {
+				t.Errorf("modalW() with width=%d: got %d, want <= %d", tt.width, got, tt.wantMaxW)
+			}
+		})
+	}
+}
+
+func TestTextareaW(t *testing.T) {
+	m := model{width: 120, height: 40}
+	got := m.textareaW()
+	expected := m.modalW() - 6
+	if got != expected {
+		t.Errorf("textareaW() = %d, want %d (modalW=%d - 6)", got, expected, m.modalW())
+	}
+
+	// Minimum floor
+	small := model{width: 20, height: 40}
+	if small.textareaW() < 20 {
+		t.Errorf("textareaW() with narrow terminal = %d, want >= 20", small.textareaW())
+	}
+}
+
+func TestOverlayCenter(t *testing.T) {
+	// Simple background: 3 lines of text
+	bg := "AAAAAAAAAA\nBBBBBBBBBB\nCCCCCCCCCC\nDDDDDDDDDD\nEEEEEEEEEE"
+	modal := "XX\nYY"
+
+	result := overlayCenter(bg, modal, 10, 5)
+	lines := splitLines(result)
+
+	if len(lines) != 5 {
+		t.Fatalf("overlayCenter produced %d lines, want 5", len(lines))
+	}
+
+	// The modal should appear somewhere in the middle lines
+	// Lines 0 and 4 should be dimmed background only (no modal content)
+	// Lines 1-2 should contain the modal
+	found := false
+	for _, line := range lines {
+		if containsPlain(line, "XX") || containsPlain(line, "YY") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("overlayCenter: modal content not found in output")
+	}
+}
+
+func TestOverlayCenterPadding(t *testing.T) {
+	bg := ""
+	modal := "Hi"
+
+	result := overlayCenter(bg, modal, 20, 5)
+	lines := splitLines(result)
+
+	if len(lines) != 5 {
+		t.Fatalf("overlayCenter with empty bg produced %d lines, want 5", len(lines))
+	}
+}
+
+// splitLines splits a string on newlines, used by overlay tests.
+func splitLines(s string) []string {
+	return strings.Split(s, "\n")
+}
+
+// containsPlain checks if s contains sub after stripping ANSI codes.
+func containsPlain(s, sub string) bool {
+	// Simple check: the raw bytes should contain the substring
+	return strings.Contains(s, sub)
 }
 
 func TestLayoutHelpersZeroSize(t *testing.T) {

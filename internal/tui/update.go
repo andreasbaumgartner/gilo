@@ -493,7 +493,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			ta := textarea.New()
 			ta.Placeholder = "Write your comment..."
 			ta.Focus()
-			ta.SetWidth(48)
+			ta.SetWidth(m.textareaW())
 			ta.SetHeight(8)
 			m.textarea = ta
 		}
@@ -506,7 +506,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		ta := textarea.New()
 		ta.Placeholder = "Issue title..."
 		ta.Focus()
-		ta.SetWidth(48)
+		ta.SetWidth(m.textareaW())
 		ta.SetHeight(1)
 		ta.CharLimit = 256
 		m.textarea = ta
@@ -514,7 +514,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		tb := textarea.New()
 		tb.Placeholder = "Describe the issue..."
 		tb.Blur()
-		tb.SetWidth(48)
+		tb.SetWidth(m.textareaW())
 		tb.SetHeight(6)
 		m.textareaBody = tb
 

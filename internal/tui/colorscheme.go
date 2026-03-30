@@ -34,6 +34,7 @@ type ColorScheme struct {
 	KeybindFg lipgloss.Color
 
 	OverlayBg         lipgloss.Color
+	ModalBg           lipgloss.Color
 	UnfocusedSelected lipgloss.Color
 
 	// Accent color for selected item left-border
@@ -84,6 +85,7 @@ var schemeDefault = ColorScheme{
 	KeybindFg: lipgloss.Color("#f8f8f2"),
 
 	OverlayBg:         lipgloss.Color("#1e1f29"),
+	ModalBg:           lipgloss.Color("#282a36"),
 	UnfocusedSelected: lipgloss.Color("#f8f8f2"),
 
 	AccentBorder: lipgloss.Color("#50fa7b"),
@@ -124,6 +126,7 @@ var schemeCatppuccin = ColorScheme{
 	KeybindFg: lipgloss.Color("#cdd6f4"), // Text
 
 	OverlayBg:         lipgloss.Color("#11111b"), // Crust
+	ModalBg:           lipgloss.Color("#1e1e2e"), // Base
 	UnfocusedSelected: lipgloss.Color("#a6adc8"), // Subtext0
 
 	AccentBorder: lipgloss.Color("#89b4fa"),
@@ -164,6 +167,7 @@ var schemeKanagawa = ColorScheme{
 	KeybindFg: lipgloss.Color("#dcd7ba"), // Fuji white
 
 	OverlayBg:         lipgloss.Color("#16161d"), // Sumi ink 0
+	ModalBg:           lipgloss.Color("#1f1f28"), // Sumi ink 1
 	UnfocusedSelected: lipgloss.Color("#c8c093"), // Old white
 
 	AccentBorder: lipgloss.Color("#7e9cd8"),
