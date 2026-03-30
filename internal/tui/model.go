@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 	"os/exec"
+	"sort"
+	"strings"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -13,6 +15,18 @@ import (
 	"github.com/andreasbaumgartner/gilo/internal/settings"
 	"github.com/andreasbaumgartner/gilo/internal/tmux"
 )
+
+// Sort columns
+type sortColumn int
+
+const (
+	sortByNumber sortColumn = iota
+	sortByTitle
+	sortByState
+	sortByCreated
+)
+
+var sortColumnNames = []string{"Number", "Title", "State", "Created"}
 
 // Messages
 
@@ -112,6 +126,9 @@ type model struct {
 
 	stateFilter string
 
+	sortCol sortColumn
+	sortAsc bool
+
 	settings settings.Settings
 }
 
@@ -133,20 +150,41 @@ func initialModel() model {
 }
 
 func (m model) filteredIssues() []github.Issue {
-	if m.stateFilter == "" {
-		return m.issues
-	}
 	var out []github.Issue
-	for _, issue := range m.issues {
-		if issue.State == m.stateFilter {
-			out = append(out, issue)
+	if m.stateFilter == "" {
+		out = make([]github.Issue, len(m.issues))
+		copy(out, m.issues)
+	} else {
+		for _, issue := range m.issues {
+			if issue.State == m.stateFilter {
+				out = append(out, issue)
+			}
 		}
 	}
+
+	sort.SliceStable(out, func(i, j int) bool {
+		var less bool
+		switch m.sortCol {
+		case sortByTitle:
+			less = strings.ToLower(out[i].Title) < strings.ToLower(out[j].Title)
+		case sortByState:
+			less = out[i].State < out[j].State
+		case sortByCreated:
+			less = out[i].CreatedAt < out[j].CreatedAt
+		default: // sortByNumber
+			less = out[i].Number < out[j].Number
+		}
+		if m.sortAsc {
+			return less
+		}
+		return !less
+	})
+
 	return out
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(fetchIssuesCmd, fetchTmuxStatusCmd, tmuxTickCmd(), refreshTickCmd())
+	return tea.Batch(fetchIssuesCmd(m.settings.GetIssuesMax()), fetchTmuxStatusCmd, tmuxTickCmd(), refreshTickCmd())
 }
 
 // Run starts the TUI application.

@@ -33,11 +33,11 @@ type Issue struct {
 	} `json:"comments"`
 }
 
-func FetchIssues() ([]Issue, error) {
+func FetchIssues(limit int) ([]Issue, error) {
 	out, err := exec.Command("gh", "issue", "list",
 		"--state", "all",
 		"--json", "number,title,author,state,body,createdAt,labels,comments",
-		"--limit", "50").Output()
+		"--limit", fmt.Sprintf("%d", limit)).Output()
 	if err != nil {
 		return nil, err
 	}
