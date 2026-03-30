@@ -140,7 +140,7 @@ func (m model) filteredIssues() []github.Issue {
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(fetchIssuesCmd, fetchTmuxStatusCmd, tmuxTickCmd(), refreshTickCmd())
+	return tea.Batch(fetchIssuesCmd(m.settings.GetIssuesMax()), fetchTmuxStatusCmd, tmuxTickCmd(), refreshTickCmd())
 }
 
 // Run starts the TUI application.
