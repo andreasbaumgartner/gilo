@@ -21,10 +21,11 @@ const (
 )
 
 type Pane struct {
-	WindowName string
-	IssueNum   int
-	LastLine   string
-	Status     PaneStatus
+	WindowName  string
+	WindowIndex int
+	IssueNum    int
+	LastLine    string
+	Status      PaneStatus
 }
 
 type WorktreeResult struct {
@@ -51,21 +52,36 @@ func FetchStatus() []Pane {
 		return nil
 	}
 
-	var windowNames []string
+	type windowEntry struct {
+		name  string
+		index int
+	}
+	var windows []windowEntry
 	if os.Getenv("TMUX") != "" {
-		out, err := exec.Command("tmux", "list-windows", "-F", "#{window_name}").Output()
+		out, err := exec.Command("tmux", "list-windows", "-F", "#{window_index}:#{window_name}").Output()
 		if err == nil {
-			windowNames = strings.Split(strings.TrimSpace(string(out)), "\n")
+			for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+				if idx := strings.IndexByte(line, ':'); idx >= 0 {
+					winIdx, _ := strconv.Atoi(line[:idx])
+					windows = append(windows, windowEntry{name: line[idx+1:], index: winIdx})
+				}
+			}
 		}
 	} else {
-		out, err := exec.Command("tmux", "list-windows", "-a", "-F", "#{window_name}").Output()
+		out, err := exec.Command("tmux", "list-windows", "-a", "-F", "#{window_index}:#{window_name}").Output()
 		if err == nil {
-			windowNames = strings.Split(strings.TrimSpace(string(out)), "\n")
+			for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+				if idx := strings.IndexByte(line, ':'); idx >= 0 {
+					winIdx, _ := strconv.Atoi(line[:idx])
+					windows = append(windows, windowEntry{name: line[idx+1:], index: winIdx})
+				}
+			}
 		}
 	}
 
 	var panes []Pane
-	for _, name := range windowNames {
+	for _, w := range windows {
+		name := w.name
 		m := issueWindowRe.FindStringSubmatch(name)
 		if m == nil {
 			continue
@@ -103,10 +119,11 @@ func FetchStatus() []Pane {
 		}
 
 		panes = append(panes, Pane{
-			WindowName: name,
-			IssueNum:   issueNum,
-			LastLine:   lastLine,
-			Status:     status,
+			WindowName:  name,
+			WindowIndex: w.index,
+			IssueNum:    issueNum,
+			LastLine:    lastLine,
+			Status:      status,
 		})
 	}
 	return panes

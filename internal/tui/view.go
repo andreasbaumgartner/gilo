@@ -289,6 +289,7 @@ func (m model) renderList() string {
 			}
 
 			statusBadge := ""
+			winNumStr := ""
 			for _, p := range m.tmuxPanes {
 				if p.IssueNum == issue.Number {
 					switch p.Status {
@@ -299,38 +300,42 @@ func (m model) renderList() string {
 					default:
 						statusBadge = workingBadge.Render("running")
 					}
+					winNumStr = dimStyle.Render(fmt.Sprintf("#%d", p.WindowIndex))
 					break
 				}
 			}
 
 			// Fixed-width columns for consistent alignment
 			const statusColWidth = 12
+			const winColWidth = 4
 			statusCol := padRight(" "+statusBadge, statusColWidth)
+			winCol := padRight(winNumStr, winColWidth)
 
 			pad := ""
 			if issue.State != "CLOSED" {
 				pad = " "
 			}
 
+			extraCols := statusColWidth + winColWidth
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-15-statusColWidth)
+			title := truncate(issue.Title, innerW-15-extraCols)
 
 			if i == m.cursor {
 				if active {
 					// Selected: green left accent + arrow indicator
 					indicator := greenStyle.Render("▶ ")
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-18-statusColWidth))
-					line := indicator + stateBadge + pad + statusCol + " " + selectedStyle.Render(rest)
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-18-extraCols))
+					line := indicator + stateBadge + pad + statusCol + winCol + " " + selectedStyle.Render(rest)
 					rows = append(rows, line)
 				} else {
-					line := "  " + stateBadge + pad + statusCol + " " + num + " " + title
+					line := "  " + stateBadge + pad + statusCol + winCol + " " + num + " " + title
 					line = lipgloss.NewStyle().
 						Foreground(activeScheme.UnfocusedSelected).
 						Render(line)
 					rows = append(rows, line)
 				}
 			} else {
-				line := "  " + stateBadge + pad + statusCol + " " + num + " " + title
+				line := "  " + stateBadge + pad + statusCol + winCol + " " + num + " " + title
 				rows = append(rows, line)
 			}
 		}
@@ -423,7 +428,7 @@ func (m model) renderDetailContent() string {
 			default:
 				statusLabel = workingBadge.Render("running")
 			}
-			b.WriteString(dimStyle.Render("└── ") + dimStyle.Render("tmux    ") + statusLabel + " " + dimStyle.Render(p.WindowName) + "\n")
+			b.WriteString(dimStyle.Render("└── ") + dimStyle.Render("tmux    ") + statusLabel + " " + dimStyle.Render(fmt.Sprintf("[%d] %s", p.WindowIndex, p.WindowName)) + "\n")
 			if p.LastLine != "" {
 				b.WriteString(dimStyle.Render("         ") + dimStyle.Render(truncate(p.LastLine, w-12)) + "\n")
 			}
@@ -523,7 +528,7 @@ func (m model) renderStatusBar() string {
 			if len(name) > 16 {
 				name = name[:16]
 			}
-			tabs = append(tabs, dot+" "+dimStyle.Render(name))
+			tabs = append(tabs, dot+" "+dimStyle.Render(fmt.Sprintf("%d:%s", p.WindowIndex, name)))
 		}
 		tmuxTabs = strings.Join(tabs, "  ")
 		tmuxTabsW = lipgloss.Width(tmuxTabs) + 2 // add separator space
