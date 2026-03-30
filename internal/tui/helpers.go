@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func panelBorder(active bool) lipgloss.Style {
@@ -65,3 +66,82 @@ func (m model) listInnerW() int { return m.listW() - 4 }
 
 func (m model) detailInnerW() int { return m.detailW() - 4 }
 func (m model) detailInnerH() int { return m.mainH() - 2 }
+
+// modalW returns a responsive modal width based on terminal size.
+func (m model) modalW() int {
+	w := m.width * 50 / 100
+	if w < 50 {
+		w = 50
+	}
+	if w > 70 {
+		w = 70
+	}
+	if w > m.width-4 {
+		w = m.width - 4
+	}
+	return w
+}
+
+// textareaW returns the inner width available for textareas inside a modal.
+func (m model) textareaW() int {
+	// modal border (1 each side) + padding (2 each side) = 6
+	w := m.modalW() - 6
+	if w < 20 {
+		w = 20
+	}
+	return w
+}
+
+// overlayCenter renders the modal centered over a dimmed version of the
+// background, creating a "blurred" popup effect.
+func overlayCenter(bg string, modal string, width, height int) string {
+	bgLines := strings.Split(bg, "\n")
+	dimFg := lipgloss.NewStyle().Foreground(activeScheme.OverlayBg)
+
+	for len(bgLines) < height {
+		bgLines = append(bgLines, "")
+	}
+	bgLines = bgLines[:height]
+
+	// Strip ANSI from background to get plain text
+	plainLines := make([]string, height)
+	for i, line := range bgLines {
+		plainLines[i] = ansi.Strip(line)
+	}
+
+	modalLines := strings.Split(modal, "\n")
+	modalH := len(modalLines)
+	modalW := lipgloss.Width(modal)
+	startY := max(0, (height-modalH)/2)
+	startX := max(0, (width-modalW)/2)
+
+	result := make([]string, height)
+	for y := 0; y < height; y++ {
+		runes := []rune(plainLines[y])
+		for len(runes) < width {
+			runes = append(runes, ' ')
+		}
+		if len(runes) > width {
+			runes = runes[:width]
+		}
+
+		if y >= startY && y < startY+modalH {
+			mi := y - startY
+			mLine := modalLines[mi]
+			mLineW := lipgloss.Width(mLine)
+
+			leftText := string(runes[:startX])
+			rightStart := startX + mLineW
+			rightText := ""
+			if rightStart < len(runes) {
+				rightText = string(runes[rightStart:])
+			}
+
+			result[y] = dimFg.Render(leftText) + mLine + dimFg.Render(rightText)
+		} else {
+			result[y] = dimFg.Render(string(runes))
+		}
+	}
+
+	return strings.Join(result, "\n")
+}

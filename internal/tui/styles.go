@@ -105,8 +105,9 @@ func applyColorScheme(cs ColorScheme) {
 	modalStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(colorActive).
-		Padding(1, 2).
-		Width(54)
+		BorderBackground(cs.ModalBg).
+		Background(cs.ModalBg).
+		Padding(1, 2)
 
 	// Accent border for selected items (green left bar)
 	accentBorder = lipgloss.NewStyle().
