@@ -11,6 +11,7 @@ type Settings struct {
 	PermissionWarningAcked     bool   `json:"permission_warning_acked"`
 	ColorScheme                string `json:"color_scheme,omitempty"`
 	IssuesMax                  int    `json:"issues_max,omitempty"`
+	AdditionalContext          bool   `json:"additional_context"`
 }
 
 const DefaultIssuesMax = 25

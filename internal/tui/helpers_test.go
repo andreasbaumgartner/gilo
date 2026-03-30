@@ -62,7 +62,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("listW", func(t *testing.T) {
 		got := m.listW()
-		want := 40 // 100*38/100=38, clamped up to listMinW=40
+		want := 50 // 100*45/100=45, clamped up to listMinW=50
 		if got != want {
 			t.Errorf("listW() = %d, want %d", got, want)
 		}
@@ -70,7 +70,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("detailW", func(t *testing.T) {
 		got := m.detailW()
-		want := 60 // 100 - 40
+		want := 50 // 100 - 50
 		if got != want {
 			t.Errorf("detailW() = %d, want %d", got, want)
 		}
@@ -86,7 +86,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("listInnerW", func(t *testing.T) {
 		got := m.listInnerW()
-		want := 36 // 40 - 4
+		want := 46 // 50 - 4
 		if got != want {
 			t.Errorf("listInnerW() = %d, want %d", got, want)
 		}
@@ -94,7 +94,7 @@ func TestLayoutHelpers(t *testing.T) {
 
 	t.Run("detailInnerW", func(t *testing.T) {
 		got := m.detailInnerW()
-		want := 56 // 60 - 4
+		want := 46 // 50 - 4
 		if got != want {
 			t.Errorf("detailInnerW() = %d, want %d", got, want)
 		}
@@ -115,9 +115,9 @@ func TestLayoutHelpersDynamic(t *testing.T) {
 		width      int
 		wantListW  int
 	}{
-		{"narrow terminal", 50, 19},        // 50*38/100=19, terminal too small for min clamp
-		{"medium terminal", 120, 45},        // 120*38/100=45, within bounds
-		{"wide terminal", 250, 80},          // 250*38/100=95, clamped to listMaxW=80
+		{"narrow terminal", 50, 22},         // 50*45/100=22, terminal too small for min clamp
+		{"medium terminal", 120, 54},        // 120*45/100=54, within bounds
+		{"wide terminal", 250, 100},         // 250*45/100=112, clamped to listMaxW=100
 		{"very narrow", 30, 10},             // 30-20=10
 	}
 

@@ -72,6 +72,9 @@ func (m model) renderModal() string {
 		if m.settings.DangerouslySkipPermissions {
 			content += "\n\n" + lipgloss.NewStyle().Foreground(colorYellow).Render("⚡ Running with --dangerously-skip-permissions")
 		}
+		if m.settings.AdditionalContext {
+			content += "\n" + lipgloss.NewStyle().Foreground(colorActive).Render("📋 Sending with additional context (labels, comments, metadata)")
+		}
 		return style.Render(strings.Join([]string{title, "", content, "", hint}, "\n"))
 
 	case modalPermissionWarning:
@@ -205,6 +208,7 @@ func (m model) renderModal() string {
 			"",
 			dimStyle.Render("── settings ──"),
 			"  " + greenStyle.Render("p") + "         permissions",
+			"  " + greenStyle.Render("i") + "         additional context",
 			"  " + greenStyle.Render("r") + "         allow-root",
 			"  " + greenStyle.Render("t") + "         color scheme",
 			"  " + greenStyle.Render("m") + "         cycle issues max",
@@ -296,7 +300,7 @@ func (m model) renderList() string {
 					case tmux.StatusReview:
 						statusBadge = reviewBadge.Render("idle")
 					case tmux.StatusQuestion:
-						statusBadge = questionBadge.Render("thinking")
+						statusBadge = questionBadge.Render("question")
 					default:
 						statusBadge = workingBadge.Render("running")
 					}
@@ -304,34 +308,49 @@ func (m model) renderList() string {
 				}
 			}
 
+			prCol := ""
+			if pr, ok := m.linkedPRs[issue.Number]; ok {
+				switch pr.State {
+				case "MERGED":
+					prCol = prMergedBadge.Render("merged")
+				case "CLOSED":
+					prCol = prMergedBadge.Render("PR closed")
+				default:
+					prCol = prBadge.Render("PR")
+				}
+			}
+
 			// Fixed-width columns for consistent alignment
 			const statusColWidth = 12
+			const prColWidth = 12
 			statusCol := padRight(" "+statusBadge, statusColWidth)
+			prColumn := padRight(" "+prCol, prColWidth)
 
 			pad := ""
 			if issue.State != "CLOSED" {
 				pad = " "
 			}
 
+			colsWidth := statusColWidth + prColWidth
 			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-15-statusColWidth)
+			title := truncate(issue.Title, innerW-15-colsWidth)
 
 			if i == m.cursor {
 				if active {
 					// Selected: green left accent + arrow indicator
 					indicator := greenStyle.Render("▶ ")
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-18-statusColWidth))
-					line := indicator + stateBadge + pad + statusCol + " " + selectedStyle.Render(rest)
+					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-18-colsWidth))
+					line := indicator + stateBadge + pad + statusCol + prColumn + " " + selectedStyle.Render(rest)
 					rows = append(rows, line)
 				} else {
-					line := "  " + stateBadge + pad + statusCol + " " + num + " " + title
+					line := "  " + stateBadge + pad + statusCol + prColumn + " " + num + " " + title
 					line = lipgloss.NewStyle().
 						Foreground(activeScheme.UnfocusedSelected).
 						Render(line)
 					rows = append(rows, line)
 				}
 			} else {
-				line := "  " + stateBadge + pad + statusCol + " " + num + " " + title
+				line := "  " + stateBadge + pad + statusCol + prColumn + " " + num + " " + title
 				rows = append(rows, line)
 			}
 		}
@@ -379,7 +398,8 @@ func (m model) renderDetailContent() string {
 
 	var b strings.Builder
 
-	b.WriteString(titleStyle.Render(fmt.Sprintf("#%d  %s", issue.Number, issue.Title)))
+	prefix := fmt.Sprintf("#%d  ", issue.Number)
+	b.WriteString(titleStyle.Render(prefix + truncate(issue.Title, w-lipgloss.Width(prefix))))
 	b.WriteString("\n\n")
 
 	// Metadata in tree-view style
@@ -394,8 +414,10 @@ func (m model) renderDetailContent() string {
 			break
 		}
 	}
+	_, hasPR := m.linkedPRs[issue.Number]
 
-	if hasLabels || hasTmux {
+	hasMore := hasLabels || hasTmux || hasPR
+	if hasMore {
 		b.WriteString(dimStyle.Render("├── ") + dimStyle.Render("created ") + issue.CreatedAt[:10] + "\n")
 	} else {
 		b.WriteString(dimStyle.Render("└── ") + dimStyle.Render("created ") + issue.CreatedAt[:10] + "\n")
@@ -407,10 +429,27 @@ func (m model) renderDetailContent() string {
 			names[i] = l.Name
 		}
 		connector := "├── "
-		if !hasTmux {
+		if !hasTmux && !hasPR {
 			connector = "└── "
 		}
 		b.WriteString(dimStyle.Render(connector) + dimStyle.Render("labels  ") + yellowStyle.Render(strings.Join(names, ", ")) + "\n")
+	}
+
+	if pr, ok := m.linkedPRs[issue.Number]; ok {
+		connector := "├── "
+		if !hasTmux {
+			connector = "└── "
+		}
+		var prStatusLabel string
+		switch pr.State {
+		case "MERGED":
+			prStatusLabel = prMergedBadge.Render("merged")
+		case "CLOSED":
+			prStatusLabel = prMergedBadge.Render("closed")
+		default:
+			prStatusLabel = prBadge.Render("open")
+		}
+		b.WriteString(dimStyle.Render(connector) + dimStyle.Render("PR      ") + prStatusLabel + " " + dimStyle.Render(fmt.Sprintf("#%d %s", pr.Number, pr.Title)) + "\n")
 	}
 
 	for _, p := range m.tmuxPanes {
@@ -420,7 +459,7 @@ func (m model) renderDetailContent() string {
 			case tmux.StatusReview:
 				statusLabel = reviewBadge.Render("idle")
 			case tmux.StatusQuestion:
-				statusLabel = questionBadge.Render("thinking")
+				statusLabel = questionBadge.Render("question")
 			default:
 				statusLabel = workingBadge.Render("running")
 			}
@@ -482,6 +521,10 @@ func (m model) renderStatusBar() string {
 		if m.settings.DangerouslySkipPermissions {
 			permLabel = "p permissions:ON"
 		}
+		ctxLabel := "i context:off"
+		if m.settings.AdditionalContext {
+			ctxLabel = "i context:ON"
+		}
 		keys = []string{
 			"↑↓/jk navigate",
 			"tab panel",
@@ -495,6 +538,7 @@ func (m model) renderStatusBar() string {
 			"s/S claude/split",
 			"K close window",
 			permLabel,
+			ctxLabel,
 			fmt.Sprintf("m max:%d", m.settings.GetIssuesMax()),
 			"t " + activeScheme.Name,
 			"l labels",

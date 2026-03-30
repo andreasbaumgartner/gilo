@@ -28,6 +28,9 @@ var (
 	keybindStyle   lipgloss.Style
 	modalStyle     lipgloss.Style
 
+	prBadge        lipgloss.Style
+	prMergedBadge  lipgloss.Style
+
 	// New styles for design refresh
 	accentBorder  lipgloss.Style
 	dotRunning    lipgloss.Style
@@ -95,6 +98,16 @@ func applyColorScheme(cs ColorScheme) {
 	reviewBadge = lipgloss.NewStyle().
 		Background(cs.ReviewBadgeBg).
 		Foreground(cs.ReviewBadgeFg).
+		Padding(0, 1)
+
+	prBadge = lipgloss.NewStyle().
+		Background(cs.PRBadgeBg).
+		Foreground(cs.PRBadgeFg).
+		Padding(0, 1)
+
+	prMergedBadge = lipgloss.NewStyle().
+		Background(cs.PRMergedBadgeBg).
+		Foreground(cs.PRMergedBadgeFg).
 		Padding(0, 1)
 
 	keybindStyle = lipgloss.NewStyle().

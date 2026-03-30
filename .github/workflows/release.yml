@@ -63,8 +63,63 @@ jobs:
           git tag -a "${{ steps.next_version.outputs.version }}" -m "Release ${{ steps.next_version.outputs.version }}"
           git push origin "${{ steps.next_version.outputs.version }}"
 
+    outputs:
+      version: ${{ steps.next_version.outputs.version }}
+
+  build:
+    needs: version-and-tag
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version-and-tag.outputs.version }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          go build -ldflags="-s -w" -o "gilo_${{ matrix.goos }}_${{ matrix.goarch }}" ./cmd/gilo/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gilo_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: gilo_${{ matrix.goos }}_${{ matrix.goarch }}
+
+  release:
+    needs: [version-and-tag, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum gilo_* > checksums.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.next_version.outputs.version }}
+          tag_name: ${{ needs.version-and-tag.outputs.version }}
           generate_release_notes: true
+          files: artifacts/*

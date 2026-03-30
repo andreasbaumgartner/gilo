@@ -60,6 +60,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.clampListOffset()
 		m.updateViewport()
+		return m, fetchLinkedPRsCmd(m.settings.GetIssuesMax())
+
+	case linkedPRsMsg:
+		if msg.err == nil {
+			m.linkedPRs = msg.prs
+			m.updateViewport()
+		}
 
 	case errMsg:
 		m.err = msg.err
@@ -461,7 +468,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modal = modalClaudeTask
 			m.modalIssue = issue.Number
 			m.modalStatus = ""
-			return m, createClaudeTaskCmd(issue, msg.String() == "S", m.settings.DangerouslySkipPermissions)
+			return m, createClaudeTaskCmd(issue, msg.String() == "S", m.settings.DangerouslySkipPermissions, m.settings.AdditionalContext)
 		}
 
 	case "p":
@@ -623,6 +630,11 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.settings.ColorScheme = next
 		settings.Save(m.settings)
 		m.updateViewport()
+
+	case "i":
+		m.settings.AdditionalContext = !m.settings.AdditionalContext
+		settings.Save(m.settings)
+		return m, nil
 
 	case "m":
 		current := m.settings.GetIssuesMax()
