@@ -140,7 +140,12 @@ type model struct {
 	sortCol sortColumn
 	sortAsc bool
 
+	pendingKey string // prefix key waiting for second keystroke (e.g. "f")
+
 	settings settings.Settings
+
+	listWidthOverride int  // 0 = use default, >0 = user-dragged width
+	draggingBorder    bool // true while mouse is dragging the panel border
 }
 
 func initialModel() model {

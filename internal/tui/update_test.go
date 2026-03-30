@@ -10,6 +10,89 @@ import (
 	"github.com/andreasbaumgartner/gilo/internal/tmux"
 )
 
+func TestPrefixKeyFilterSort(t *testing.T) {
+	baseModel := func() model {
+		return model{
+			width:       100,
+			height:      50,
+			loaded:      true,
+			stateFilter: "OPEN",
+			issues: []github.Issue{
+				{Number: 1, Title: "Alpha", State: "OPEN", CreatedAt: "2025-01-01T00:00:00Z"},
+				{Number: 2, Title: "Beta", State: "OPEN", CreatedAt: "2025-01-02T00:00:00Z"},
+				{Number: 3, Title: "Gamma", State: "CLOSED", CreatedAt: "2025-01-03T00:00:00Z"},
+			},
+		}
+	}
+
+	t.Run("f sets pending key", func(t *testing.T) {
+		m := baseModel()
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}}
+		result, _ := m.updateNormal(msg)
+		rm := result.(model)
+		if rm.pendingKey != "f" {
+			t.Errorf("expected pendingKey = %q, got %q", "f", rm.pendingKey)
+		}
+	})
+
+	t.Run("ff cycles filter", func(t *testing.T) {
+		m := baseModel()
+		m.pendingKey = "f"
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}}
+		result, _ := m.updateNormal(msg)
+		rm := result.(model)
+		if rm.stateFilter != "CLOSED" {
+			t.Errorf("expected stateFilter = %q, got %q", "CLOSED", rm.stateFilter)
+		}
+		if rm.pendingKey != "" {
+			t.Errorf("expected pendingKey cleared, got %q", rm.pendingKey)
+		}
+	})
+
+	t.Run("fs cycles sort column", func(t *testing.T) {
+		m := baseModel()
+		m.pendingKey = "f"
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}}
+		result, _ := m.updateNormal(msg)
+		rm := result.(model)
+		if rm.sortCol != sortByTitle {
+			t.Errorf("expected sortCol = sortByTitle, got %d", rm.sortCol)
+		}
+		if rm.pendingKey != "" {
+			t.Errorf("expected pendingKey cleared, got %q", rm.pendingKey)
+		}
+	})
+
+	t.Run("fd toggles sort direction", func(t *testing.T) {
+		m := baseModel()
+		m.pendingKey = "f"
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}}
+		result, _ := m.updateNormal(msg)
+		rm := result.(model)
+		if !rm.sortAsc {
+			t.Error("expected sortAsc = true after toggle")
+		}
+		if rm.pendingKey != "" {
+			t.Errorf("expected pendingKey cleared, got %q", rm.pendingKey)
+		}
+	})
+
+	t.Run("f then unknown key cancels pending", func(t *testing.T) {
+		m := baseModel()
+		m.pendingKey = "f"
+		msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'z'}}
+		result, _ := m.updateNormal(msg)
+		rm := result.(model)
+		if rm.pendingKey != "" {
+			t.Errorf("expected pendingKey cleared, got %q", rm.pendingKey)
+		}
+		// Filter should be unchanged
+		if rm.stateFilter != "OPEN" {
+			t.Errorf("expected stateFilter unchanged, got %q", rm.stateFilter)
+		}
+	})
+}
+
 func TestAdditionalContextToggle(t *testing.T) {
 	t.Run("i toggles additional context on", func(t *testing.T) {
 		m := model{
