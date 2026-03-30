@@ -60,6 +60,7 @@ type tmuxWindowKilledMsg struct {
 type tmuxStatusMsg []tmux.Pane
 type tmuxTickMsg struct{}
 type refreshTickMsg struct{}
+type selfUpdateMsg struct{ err error }
 type linkedPRsMsg struct {
 	prs map[int]github.PR
 	err error
@@ -91,6 +92,7 @@ const (
 	modalPermissionWarning
 	modalKillWindowConfirm
 	modalHelp
+	modalUpdateConfirm
 )
 
 // Model
