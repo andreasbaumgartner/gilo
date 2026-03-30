@@ -28,12 +28,14 @@ func fetchTmuxStatusCmd() tea.Msg {
 	return tmuxStatusMsg(tmux.FetchStatus())
 }
 
-func fetchIssuesCmd() tea.Msg {
-	issues, err := github.FetchIssues()
-	if err != nil {
-		return errMsg{err}
+func fetchIssuesCmd(limit int) tea.Cmd {
+	return func() tea.Msg {
+		issues, err := github.FetchIssues(limit)
+		if err != nil {
+			return errMsg{err}
+		}
+		return issuesLoadedMsg(issues)
 	}
-	return issuesLoadedMsg(issues)
 }
 
 func fetchLabelsCmd(issue github.Issue) tea.Cmd {

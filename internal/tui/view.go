@@ -174,6 +174,8 @@ func (m model) renderModal() string {
 			"  " + greenStyle.Render("↓/j") + "       move down",
 			"  " + greenStyle.Render("tab") + "       switch panel",
 			"  " + greenStyle.Render("f") + "         cycle filter",
+			"  " + greenStyle.Render("a") + "         cycle sort column",
+			"  " + greenStyle.Render("A") + "         toggle sort direction",
 			"",
 			dimStyle.Render("── actions ──"),
 			"  " + greenStyle.Render("enter") + "     jump / open",
@@ -190,7 +192,9 @@ func (m model) renderModal() string {
 			"",
 			dimStyle.Render("── settings ──"),
 			"  " + greenStyle.Render("p") + "         permissions",
+			"  " + greenStyle.Render("r") + "         allow-root",
 			"  " + greenStyle.Render("t") + "         color scheme",
+			"  " + greenStyle.Render("m") + "         cycle issues max",
 			"",
 			dimStyle.Render("esc/?  close"),
 		}
@@ -218,12 +222,18 @@ func (m model) renderList() string {
 		refreshIndicator = " " + yellowStyle.Render("⟳")
 	}
 
+	sortDir := "↓"
+	if m.sortAsc {
+		sortDir = "↑"
+	}
+	sortLabel := dimStyle.Render("[" + sortColumnNames[m.sortCol] + sortDir + "]")
+
 	filtered := m.filteredIssues()
 	count := len(filtered)
 
-	header := titleStyle.Render("Issues") + " " + dimStyle.Render(fmt.Sprintf("(%d)", count)) + " " + dimStyle.Render(filterLabel) + refreshIndicator
+	header := titleStyle.Render("Issues") + " " + dimStyle.Render(fmt.Sprintf("(%d)", count)) + " " + dimStyle.Render(filterLabel) + " " + sortLabel + refreshIndicator
 	if !active {
-		header = dimStyle.Render("Issues") + " " + dimStyle.Render(fmt.Sprintf("(%d)", count)) + " " + dimStyle.Render(filterLabel) + refreshIndicator
+		header = dimStyle.Render("Issues") + " " + dimStyle.Render(fmt.Sprintf("(%d)", count)) + " " + dimStyle.Render(filterLabel) + " " + sortLabel + refreshIndicator
 	}
 
 	var rows []string
@@ -463,12 +473,15 @@ func (m model) renderStatusBar() string {
 			"↑↓/jk navigate",
 			"tab panel",
 			"f filter",
+			"a/A sort",
+			"g refresh",
 			"enter jump",
 			"o browser",
 			"c comment",
 			"w worktree",
 			"s claude",
 			permLabel,
+			fmt.Sprintf("m max:%d", m.settings.GetIssuesMax()),
 			"t " + activeScheme.Name,
 			"l labels",
 			"x close",

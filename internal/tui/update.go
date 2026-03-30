@@ -26,7 +26,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case refreshTickMsg:
 		m.refreshing = true
-		return m, tea.Batch(fetchIssuesCmd, refreshTickCmd())
+		return m, tea.Batch(fetchIssuesCmd(m.settings.GetIssuesMax()), refreshTickCmd())
 
 	case tmuxStatusMsg:
 		m.tmuxPanes = msg
@@ -71,7 +71,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case issueCreatedMsg:
@@ -80,7 +80,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case issueDeletedMsg:
@@ -89,7 +89,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case issueClosedMsg:
@@ -98,7 +98,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case issueReopenedMsg:
@@ -107,7 +107,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case labelsLoadedMsg:
@@ -126,7 +126,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.modal = modalNone
 			m.modalStatus = ""
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case worktreeCreatedMsg:
@@ -531,7 +531,7 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "g":
 		if !m.refreshing {
 			m.refreshing = true
-			return m, fetchIssuesCmd
+			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
 		}
 
 	case "f":
@@ -547,6 +547,23 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.cursor >= len(filtered) {
 			m.cursor = max(0, len(filtered)-1)
 		}
+		m.listOffset = 0
+		m.clampListOffset()
+		m.updateViewport()
+
+	case "a":
+		// Cycle to next sort column (descending by default)
+		m.sortCol = (m.sortCol + 1) % sortColumn(len(sortColumnNames))
+		m.sortAsc = false
+		m.cursor = 0
+		m.listOffset = 0
+		m.clampListOffset()
+		m.updateViewport()
+
+	case "A":
+		// Toggle sort direction for current column
+		m.sortAsc = !m.sortAsc
+		m.cursor = 0
 		m.listOffset = 0
 		m.clampListOffset()
 		m.updateViewport()
@@ -567,6 +584,21 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.settings.ColorScheme = next
 		settings.Save(m.settings)
 		m.updateViewport()
+
+	case "m":
+		current := m.settings.GetIssuesMax()
+		opts := settings.IssuesMaxOptions
+		next := opts[0]
+		for i, v := range opts {
+			if v == current {
+				next = opts[(i+1)%len(opts)]
+				break
+			}
+		}
+		m.settings.IssuesMax = next
+		settings.Save(m.settings)
+		m.refreshing = true
+		return m, fetchIssuesCmd(next)
 	}
 
 	return m, nil
