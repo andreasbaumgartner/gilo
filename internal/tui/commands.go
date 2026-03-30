@@ -83,6 +83,12 @@ func deleteIssueCmd(issueNum int) tea.Cmd {
 	}
 }
 
+func mergeIssuesCmd(source, target github.Issue) tea.Cmd {
+	return func() tea.Msg {
+		return issueMergedMsg{github.MergeIssues(source, target)}
+	}
+}
+
 func createWorktreeCmd(issue github.Issue, split bool) tea.Cmd {
 	return func() tea.Msg {
 		branch, path, existed, err := worktree.Ensure(issue.Number, issue.Title)
