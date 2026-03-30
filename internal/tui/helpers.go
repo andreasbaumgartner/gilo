@@ -145,3 +145,45 @@ func overlayCenter(bg string, modal string, width, height int) string {
 
 	return strings.Join(result, "\n")
 }
+
+// overlayAt places content at a specific position over the background without
+// dimming. Used for lightweight tooltips.
+func overlayAt(bg string, content string, x, y, width, height int) string {
+	bgLines := strings.Split(bg, "\n")
+	for len(bgLines) < height {
+		bgLines = append(bgLines, "")
+	}
+	bgLines = bgLines[:height]
+
+	contentLines := strings.Split(content, "\n")
+
+	for i, cLine := range contentLines {
+		row := y + i
+		if row < 0 || row >= height {
+			continue
+		}
+
+		bgRunes := []rune(ansi.Strip(bgLines[row]))
+		for len(bgRunes) < width {
+			bgRunes = append(bgRunes, ' ')
+		}
+
+		cLineW := lipgloss.Width(cLine)
+		leftEnd := x
+		if leftEnd > len(bgRunes) {
+			leftEnd = len(bgRunes)
+		}
+		rightStart := x + cLineW
+		if rightStart > len(bgRunes) {
+			rightStart = len(bgRunes)
+		}
+
+		line := string(bgRunes[:leftEnd]) + cLine
+		if rightStart < len(bgRunes) {
+			line += string(bgRunes[rightStart:])
+		}
+		bgLines[row] = line
+	}
+
+	return strings.Join(bgLines, "\n")
+}

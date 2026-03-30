@@ -35,6 +35,22 @@ func (m model) View() string {
 		}
 		lines[m.height-1] = statusBar
 		screen = strings.Join(lines, "\n")
+	} else if fullTitle, row, ok := m.selectedTitleTruncated(); ok {
+		// Show tooltip for truncated issue title
+		maxW := m.listW() - 4
+		if maxW < 10 {
+			maxW = 10
+		}
+		tooltip := tooltipStyle.Width(maxW).Render(fullTitle)
+		// Position tooltip just below the selected row inside the list panel
+		// +1 for panel border, +2 for header rows (title + blank line)
+		scrollOffset := 0
+		if m.listOffset > 0 {
+			scrollOffset = 1 // "↑ N more" indicator row
+		}
+		tooltipY := 1 + 2 + scrollOffset + (row - m.listOffset) + 1
+		tooltipX := 1 // inside left panel border
+		screen = overlayAt(screen, tooltip, tooltipX, tooltipY, m.width, m.height)
 	}
 
 	return screen
@@ -288,9 +304,12 @@ func (m model) renderList() string {
 			i := idx
 			issue := filtered[idx]
 
-			stateBadge := openBadge.Render("open")
+			stateDot := greenStyle.Render("●")
 			if issue.State == "CLOSED" {
-				stateBadge = closedBadge.Render("closed")
+				stateDot = redStyle.Render("●")
+			}
+			if pr, ok := m.linkedPRs[issue.Number]; ok && pr.State == "OPEN" {
+				stateDot = yellowStyle.Render("●")
 			}
 
 			statusBadge := ""
@@ -314,43 +333,63 @@ func (m model) renderList() string {
 				case "MERGED":
 					prCol = prMergedBadge.Render("merged")
 				case "CLOSED":
-					prCol = prMergedBadge.Render("PR closed")
+					prCol = prClosedBadge.Render("closed")
 				default:
 					prCol = prBadge.Render("PR")
 				}
 			}
 
-			// Fixed-width columns for consistent alignment
+			// Build right-aligned status + PR columns
 			const statusColWidth = 12
 			const prColWidth = 12
 			statusCol := padRight(" "+statusBadge, statusColWidth)
 			prColumn := padRight(" "+prCol, prColWidth)
+			rightCols := statusCol + prColumn
 
-			pad := ""
-			if issue.State != "CLOSED" {
-				pad = " "
+			// Calculate how much space the title can use
+			// Layout: "▶ ● #1234 title... status pr" or "  ● #1234 title... status pr"
+			prefixW := 4 + 6 // "▶ ●" or "  ●" (4) + "#1234 " (6)
+			rightW := statusColWidth + prColWidth
+			titleMaxW := innerW - prefixW - rightW
+			if titleMaxW < 4 {
+				titleMaxW = 4
 			}
-
-			colsWidth := statusColWidth + prColWidth
-			num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
-			title := truncate(issue.Title, innerW-15-colsWidth)
 
 			if i == m.cursor {
 				if active {
-					// Selected: green left accent + arrow indicator
 					indicator := greenStyle.Render("▶ ")
-					rest := fmt.Sprintf("#%-4d %s", issue.Number, truncate(issue.Title, innerW-18-colsWidth))
-					line := indicator + stateBadge + pad + statusCol + prColumn + " " + selectedStyle.Render(rest)
+					numStr := fmt.Sprintf("#%-4d ", issue.Number)
+					t := truncate(issue.Title, titleMaxW)
+					leftPart := indicator + stateDot + " " + selectedStyle.Render(numStr+t)
+					gap := innerW - lipgloss.Width(leftPart) - lipgloss.Width(rightCols)
+					if gap < 1 {
+						gap = 1
+					}
+					line := leftPart + strings.Repeat(" ", gap) + rightCols
 					rows = append(rows, line)
 				} else {
-					line := "  " + stateBadge + pad + statusCol + prColumn + " " + num + " " + title
+					num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
+					t := truncate(issue.Title, titleMaxW)
+					leftPart := "  " + stateDot + " " + num + " " + t
+					gap := innerW - lipgloss.Width(leftPart) - lipgloss.Width(rightCols)
+					if gap < 1 {
+						gap = 1
+					}
+					line := leftPart + strings.Repeat(" ", gap) + rightCols
 					line = lipgloss.NewStyle().
 						Foreground(activeScheme.UnfocusedSelected).
 						Render(line)
 					rows = append(rows, line)
 				}
 			} else {
-				line := "  " + stateBadge + pad + statusCol + prColumn + " " + num + " " + title
+				num := dimStyle.Render(fmt.Sprintf("#%-4d", issue.Number))
+				t := truncate(issue.Title, titleMaxW)
+				leftPart := "  " + stateDot + " " + num + " " + t
+				gap := innerW - lipgloss.Width(leftPart) - lipgloss.Width(rightCols)
+				if gap < 1 {
+					gap = 1
+				}
+				line := leftPart + strings.Repeat(" ", gap) + rightCols
 				rows = append(rows, line)
 			}
 		}
@@ -445,7 +484,7 @@ func (m model) renderDetailContent() string {
 		case "MERGED":
 			prStatusLabel = prMergedBadge.Render("merged")
 		case "CLOSED":
-			prStatusLabel = prMergedBadge.Render("closed")
+			prStatusLabel = prClosedBadge.Render("closed")
 		default:
 			prStatusLabel = prBadge.Render("open")
 		}
@@ -608,4 +647,34 @@ func (m model) renderStatusBar() string {
 		bar += strings.Repeat(" ", m.width-barW)
 	}
 	return bar
+}
+
+// selectedTitleTruncated checks if the currently selected issue's title is
+// truncated in the list panel. Returns the full title, the row index, and true
+// if truncated.
+func (m model) selectedTitleTruncated() (string, int, bool) {
+	if !m.loaded {
+		return "", 0, false
+	}
+	filtered := m.filteredIssues()
+	if len(filtered) == 0 || m.cursor >= len(filtered) {
+		return "", 0, false
+	}
+
+	issue := filtered[m.cursor]
+	innerW := m.listInnerW()
+
+	const statusColWidth = 12
+	const prColWidth = 12
+	prefixW := 4 + 6 // indicator/space + dot + "#1234 "
+	rightW := statusColWidth + prColWidth
+	titleMaxW := innerW - prefixW - rightW
+	if titleMaxW < 4 {
+		titleMaxW = 4
+	}
+
+	if len([]rune(issue.Title)) > titleMaxW {
+		return issue.Title, m.cursor, true
+	}
+	return "", 0, false
 }
