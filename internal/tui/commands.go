@@ -104,6 +104,26 @@ func createClaudeTaskCmd(issue github.Issue, split bool, dangerouslySkipPermissi
 	}
 }
 
+func listWorktreesCmd() tea.Cmd {
+	return func() tea.Msg {
+		entries, err := worktree.List()
+		return worktreeListMsg{entries: entries, err: err}
+	}
+}
+
+func removeWorktreesCmd(paths []string) tea.Cmd {
+	return func() tea.Msg {
+		var removed []string
+		for _, p := range paths {
+			if err := worktree.Remove(p); err != nil {
+				return worktreeRemovedMsg{removed: removed, failed: p, err: err}
+			}
+			removed = append(removed, p)
+		}
+		return worktreeRemovedMsg{removed: removed}
+	}
+}
+
 func buildClaudePrompt(issue github.Issue, additionalContext bool) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("GitHub Issue #%d: %s", issue.Number, issue.Title))

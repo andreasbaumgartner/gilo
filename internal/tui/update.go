@@ -10,6 +10,7 @@ import (
 	"github.com/andreasbaumgartner/gilo/internal/github"
 	"github.com/andreasbaumgartner/gilo/internal/settings"
 	"github.com/andreasbaumgartner/gilo/internal/tmux"
+	"github.com/andreasbaumgartner/gilo/internal/worktree"
 )
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -142,6 +143,52 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.modal = modalNone
 			m.modalStatus = ""
 			return m, fetchIssuesCmd(m.settings.GetIssuesMax())
+		}
+
+	case worktreeListMsg:
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Error: %v", msg.err)
+		} else {
+			// Filter out the main worktree (bare or no branch prefix "issue-")
+			var filtered []worktree.WorktreeEntry
+			for _, e := range msg.entries {
+				if !e.Bare && strings.HasPrefix(e.Branch, "issue-") {
+					filtered = append(filtered, e)
+				}
+			}
+			m.worktreeEntries = filtered
+			m.worktreeCursor = 0
+			m.worktreeSelected = make(map[int]bool)
+			if len(filtered) == 0 {
+				m.modalStatus = "No issue worktrees found."
+			} else {
+				m.modalStatus = ""
+			}
+		}
+
+	case worktreeRemovedMsg:
+		// Remove successfully deleted entries from the list
+		removedSet := make(map[string]bool)
+		for _, p := range msg.removed {
+			removedSet[p] = true
+		}
+		var remaining []worktree.WorktreeEntry
+		for _, e := range m.worktreeEntries {
+			if !removedSet[e.Path] {
+				remaining = append(remaining, e)
+			}
+		}
+		m.worktreeEntries = remaining
+		m.worktreeSelected = make(map[int]bool)
+		if m.worktreeCursor >= len(remaining) {
+			m.worktreeCursor = max(0, len(remaining)-1)
+		}
+		if msg.err != nil {
+			m.modalStatus = fmt.Sprintf("Removed %d worktree(s). Error on %s:\n%v", len(msg.removed), msg.failed, msg.err)
+		} else if len(remaining) == 0 {
+			m.modalStatus = "All worktrees cleaned up!"
+		} else {
+			m.modalStatus = fmt.Sprintf("Removed %d worktree(s).", len(msg.removed))
 		}
 
 	case worktreeCreatedMsg:
@@ -330,6 +377,46 @@ func (m model) updateModal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.textareaBody, cmd = m.textareaBody.Update(msg)
 		}
 		return m, cmd
+
+	case modalWorktreeCleanup:
+		switch msg.String() {
+		case "esc":
+			m.modal = modalNone
+			m.modalStatus = ""
+			return m, nil
+		case "j", "down":
+			if m.worktreeCursor < len(m.worktreeEntries)-1 {
+				m.worktreeCursor++
+			}
+			return m, nil
+		case "k", "up":
+			if m.worktreeCursor > 0 {
+				m.worktreeCursor--
+			}
+			return m, nil
+		case " ":
+			if len(m.worktreeEntries) > 0 {
+				m.worktreeSelected[m.worktreeCursor] = !m.worktreeSelected[m.worktreeCursor]
+			}
+			return m, nil
+		case "ctrl+d":
+			// Remove selected worktrees (or the one under cursor if none selected)
+			var toRemove []string
+			for i, e := range m.worktreeEntries {
+				if m.worktreeSelected[i] {
+					toRemove = append(toRemove, e.Path)
+				}
+			}
+			if len(toRemove) == 0 && len(m.worktreeEntries) > 0 {
+				toRemove = append(toRemove, m.worktreeEntries[m.worktreeCursor].Path)
+			}
+			if len(toRemove) == 0 {
+				return m, nil
+			}
+			m.modalStatus = fmt.Sprintf("Removing %d worktree(s)...", len(toRemove))
+			return m, removeWorktreesCmd(toRemove)
+		}
+		return m, nil
 
 	case modalLabel:
 		switch msg.String() {
@@ -552,6 +639,11 @@ func (m model) updateNormal(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.modalStatus = ""
 		}
 		return m, nil
+
+	case "C":
+		m.modal = modalWorktreeCleanup
+		m.modalStatus = "Loading worktrees..."
+		return m, listWorktreesCmd()
 
 	case "K":
 		filtered := m.filteredIssues()
