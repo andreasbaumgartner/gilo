@@ -30,12 +30,14 @@ var (
 
 	prBadge        lipgloss.Style
 	prMergedBadge  lipgloss.Style
+	prClosedBadge  lipgloss.Style
 
 	// New styles for design refresh
 	accentBorder  lipgloss.Style
 	dotRunning    lipgloss.Style
 	dotThinking   lipgloss.Style
 	dotIdle       lipgloss.Style
+	tooltipStyle  lipgloss.Style
 )
 
 func init() {
@@ -110,6 +112,11 @@ func applyColorScheme(cs ColorScheme) {
 		Foreground(cs.PRMergedBadgeFg).
 		Padding(0, 1)
 
+	prClosedBadge = lipgloss.NewStyle().
+		Background(cs.PRClosedBadgeBg).
+		Foreground(cs.PRClosedBadgeFg).
+		Padding(0, 1)
+
 	keybindStyle = lipgloss.NewStyle().
 		Background(cs.KeybindBg).
 		Foreground(cs.KeybindFg).
@@ -133,4 +140,11 @@ func applyColorScheme(cs ColorScheme) {
 	dotRunning = lipgloss.NewStyle().Foreground(cs.DotRunning)
 	dotThinking = lipgloss.NewStyle().Foreground(cs.DotThinking)
 	dotIdle = lipgloss.NewStyle().Foreground(cs.DotIdle)
+
+	tooltipStyle = lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorActive).
+		Background(cs.ModalBg).
+		BorderBackground(cs.ModalBg).
+		Padding(0, 1)
 }
