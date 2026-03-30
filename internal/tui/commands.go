@@ -38,6 +38,13 @@ func fetchIssuesCmd(limit int) tea.Cmd {
 	}
 }
 
+func fetchLinkedPRsCmd(limit int) tea.Cmd {
+	return func() tea.Msg {
+		prs, err := github.FetchLinkedPRs(limit)
+		return linkedPRsMsg{prs: prs, err: err}
+	}
+}
+
 func fetchLabelsCmd(issue github.Issue) tea.Cmd {
 	return func() tea.Msg {
 		labels, err := github.FetchLabels()

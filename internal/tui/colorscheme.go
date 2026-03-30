@@ -25,6 +25,10 @@ type ColorScheme struct {
 	ReviewBadgeFg   lipgloss.Color
 	QuestionBadgeBg lipgloss.Color
 	QuestionBadgeFg lipgloss.Color
+	PRBadgeBg       lipgloss.Color
+	PRBadgeFg       lipgloss.Color
+	PRMergedBadgeBg lipgloss.Color
+	PRMergedBadgeFg lipgloss.Color
 
 	KeybindBg lipgloss.Color
 	KeybindFg lipgloss.Color
@@ -71,6 +75,10 @@ var schemeDefault = ColorScheme{
 	ReviewBadgeFg:   lipgloss.Color("#6272a4"),
 	QuestionBadgeBg: lipgloss.Color("#3a3a1a"),
 	QuestionBadgeFg: lipgloss.Color("#f1fa8c"),
+	PRBadgeBg:       lipgloss.Color("#1a2a3a"),
+	PRBadgeFg:       lipgloss.Color("#8be9fd"),
+	PRMergedBadgeBg: lipgloss.Color("#2a1a3a"),
+	PRMergedBadgeFg: lipgloss.Color("#bd93f9"),
 
 	KeybindBg: lipgloss.Color("#282a36"),
 	KeybindFg: lipgloss.Color("#f8f8f2"),
@@ -107,6 +115,10 @@ var schemeCatppuccin = ColorScheme{
 	ReviewBadgeFg:   lipgloss.Color("#94e2d5"), // Teal
 	QuestionBadgeBg: lipgloss.Color("#3a1a4a"), // Dark mauve
 	QuestionBadgeFg: lipgloss.Color("#cba6f7"), // Mauve
+	PRBadgeBg:       lipgloss.Color("#1a3040"), // Dark sapphire
+	PRBadgeFg:       lipgloss.Color("#74c7ec"), // Sapphire
+	PRMergedBadgeBg: lipgloss.Color("#2a1a3a"), // Dark lavender
+	PRMergedBadgeFg: lipgloss.Color("#b4befe"), // Lavender
 
 	KeybindBg: lipgloss.Color("#313244"), // Surface0
 	KeybindFg: lipgloss.Color("#cdd6f4"), // Text
@@ -143,6 +155,10 @@ var schemeKanagawa = ColorScheme{
 	ReviewBadgeFg:   lipgloss.Color("#7fb4ca"), // Spring blue
 	QuestionBadgeBg: lipgloss.Color("#352a3a"), // Dark purple
 	QuestionBadgeFg: lipgloss.Color("#957fb8"), // Oni violet
+	PRBadgeBg:       lipgloss.Color("#1a2a3a"), // Dark wave blue
+	PRBadgeFg:       lipgloss.Color("#7fb4ca"), // Spring blue
+	PRMergedBadgeBg: lipgloss.Color("#2a1a30"), // Dark wisteria
+	PRMergedBadgeFg: lipgloss.Color("#938aa9"), // Spring violet
 
 	KeybindBg: lipgloss.Color("#2a2a37"), // Sumi ink 3
 	KeybindFg: lipgloss.Color("#dcd7ba"), // Fuji white
