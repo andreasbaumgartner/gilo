@@ -295,7 +295,7 @@ func (m model) renderList() string {
 					case tmux.StatusReview:
 						statusBadge = reviewBadge.Render("idle")
 					case tmux.StatusQuestion:
-						statusBadge = questionBadge.Render("thinking")
+						statusBadge = questionBadge.Render("question")
 					default:
 						statusBadge = workingBadge.Render("running")
 					}
@@ -453,7 +453,7 @@ func (m model) renderDetailContent() string {
 			case tmux.StatusReview:
 				statusLabel = reviewBadge.Render("idle")
 			case tmux.StatusQuestion:
-				statusLabel = questionBadge.Render("thinking")
+				statusLabel = questionBadge.Render("question")
 			default:
 				statusLabel = workingBadge.Render("running")
 			}
